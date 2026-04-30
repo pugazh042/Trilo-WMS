@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Create SKU{% endblock %}
+{% block header_title %}Create SKU{% endblock %}
+{% block content %}
+<div class="card"><div class="card-body"><form method="post">{% csrf_token %}
+<div class="form-group"><label class="form-label">SKU Name</label><input class="form-control" name="name" required></div>
+<div class="form-group"><label class="form-label">SKU Code</label><input class="form-control" name="code" required></div>
+<div class="form-group"><label class="form-label">Category</label><input class="form-control" name="category"></div>
+<div class="form-group"><label class="form-label">Brand</label><input class="form-control" name="brand"></div>
+<div class="form-group"><label class="form-label">Unit Type</label><select class="form-control" name="unit_type">{% for k,v in unit_types %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
+<div class="form-group"><label class="form-label">Weight</label><input class="form-control" name="weight" type="number" step="0.01" min="0"></div>
+<div class="form-group"><label class="form-label">Dimensions</label><input class="form-control" name="dimensions" placeholder="L x W x H"></div>
+<div style="display:flex;gap:8px"><button class="btn btn-primary" type="submit">Save</button><a class="btn btn-outline" href="/inventory/skus/">Cancel</a></div>
+</form></div></div>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — Returns{% endblock %}
+{% block header_title %}Returns{% endblock %}
+
+{% block content %}
+  <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap">
+    <div>
+      <div class="page-title">Returns</div>
+      <div class="page-subtitle">Request → inspect → decide</div>
+    </div>
+    <a class="btn btn-primary" href="/returns/request/">New return request</a>
+  </div>
+
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      <table style="width:100%; border-collapse:collapse">
+        <thead>
+          <tr style="background:var(--bg); border-bottom:1px solid var(--border)">
+            <th style="text-align:left; padding:12px 16px">Order</th>
+            <th style="text-align:left; padding:12px 16px">Status</th>
+            <th style="text-align:left; padding:12px 16px">Reason</th>
+            <th style="text-align:right; padding:12px 16px">Inspect</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:12px 16px; font-family:var(--mono)">{{ r.order.order_id }}</td>
+              <td style="padding:12px 16px"><span class="badge badge-info">{{ r.get_status_display }}</span></td>
+              <td style="padding:12px 16px">{{ r.reason|default:"—" }}</td>
+              <td style="padding:12px 16px; text-align:right">
+                <a class="btn btn-outline btn-sm" href="/returns/{{ r.id }}/inspect/">Open</a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" style="padding:16px" class="muted">No returns yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}
+

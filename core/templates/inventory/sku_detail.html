@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}SKU Detail{% endblock %}
+{% block header_title %}SKU Detail{% endblock %}
+{% block content %}
+<div class="page-header"><div class="page-title">{{ sku.sku_code }} - {{ sku.name }}</div><div class="page-subtitle">{{ sku.category }} / {{ sku.brand }} / {{ sku.get_unit_type_display }}</div></div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
+  <div class="card"><div class="card-body"><div class="muted">Total Quantity</div><div style="font-size:28px;font-weight:800">{{ total_qty }}</div></div></div>
+  <div class="card"><div class="card-body"><div class="muted">Available</div><div style="font-size:28px;font-weight:800">{{ available_qty }}</div></div></div>
+  <div class="card"><div class="card-body"><div class="muted">Allocated</div><div style="font-size:28px;font-weight:800">{{ allocated_qty }}</div></div></div>
+</div>
+<div class="card"><div class="card-body" style="padding:0">
+  <table style="width:100%;border-collapse:collapse">
+    <thead><tr style="background:var(--bg);border-bottom:1px solid var(--border)"><th style="padding:12px 16px;text-align:left">Warehouse</th><th style="padding:12px 16px;text-align:left">Zone</th><th style="padding:12px 16px;text-align:left">Location</th><th style="padding:12px 16px;text-align:right">Qty</th></tr></thead>
+    <tbody>{% for r in inventory_rows %}<tr style="border-bottom:1px solid var(--border)"><td style="padding:12px 16px">{{ r.warehouse.code }}</td><td style="padding:12px 16px">{{ r.zone.code|default:"-" }}</td><td style="padding:12px 16px;font-family:var(--mono)">{{ r.warehouse.code }} > {{ r.zone.code|default:"-" }} > {{ r.bin.rack.rack_number|default:"-" }} > L{{ r.bin.level.level_number|default:r.bin.level_number }} > {{ r.bin.bin_code|default:"-" }}</td><td style="padding:12px 16px;text-align:right">{{ r.quantity }}</td></tr>{% empty %}<tr><td colspan="4" style="padding:16px" class="muted">No inventory records.</td></tr>{% endfor %}</tbody>
+  </table>
+</div></div>
+{% endblock %}

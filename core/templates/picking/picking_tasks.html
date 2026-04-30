@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — Picking{% endblock %}
+{% block header_title %}Picking{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div class="page-title">My Pick Tasks</div>
+    <div class="page-subtitle">Scan bin → scan SKU → confirm qty</div>
+  </div>
+
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      <table style="width:100%; border-collapse:collapse">
+        <thead>
+          <tr style="background:var(--bg); border-bottom:1px solid var(--border)">
+            <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Task</th>
+            <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Order</th>
+            <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">SKU</th>
+            <th style="text-align:right; padding:12px 16px; font-size:12px; color:var(--text-muted)">Qty</th>
+            <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Location</th>
+            <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Status</th>
+            <th style="text-align:right; padding:12px 16px; font-size:12px; color:var(--text-muted)">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in tasks %}
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:12px 16px; font-family:var(--mono)">PT{{ t.id }}</td>
+              <td style="padding:12px 16px; font-family:var(--mono)">#{{ t.order.id }}</td>
+              <td style="padding:12px 16px; font-family:var(--mono)">{{ t.order_item.sku.sku_code }}</td>
+              <td style="padding:12px 16px; text-align:right; font-family:var(--mono)">{{ t.required_qty }}</td>
+              <td style="padding:12px 16px; font-family:var(--mono)">{{ t.stock_bin.location.code }}</td>
+              <td style="padding:12px 16px"><span class="badge badge-purple">{{ t.get_status_display }}</span></td>
+              <td style="padding:12px 16px; text-align:right">
+                {% if t.status != 'done' %}
+                  <a class="btn btn-primary btn-sm" href="/picking/task/{{ t.id }}/">Start</a>
+                {% else %}
+                  <span class="muted">Done</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="7" style="padding:16px" class="muted">No tasks assigned yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}
+

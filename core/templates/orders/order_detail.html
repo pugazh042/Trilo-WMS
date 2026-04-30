@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — {{ order.order_id }}{% endblock %}
+{% block header_title %}{{ order.order_id }}{% endblock %}
+
+{% block content %}
+  <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap">
+    <div>
+      <div class="page-title">{{ order.order_id }}</div>
+      <div class="page-subtitle">
+        {{ order.customer_name }} ·
+        <span class="badge badge-info">{{ order.get_status_display }}</span>
+        <span class="badge badge-purple">{{ order.get_allocation_status_display }}</span>
+        {% if order.on_hold %}<span class="badge badge-warning">On hold</span>{% endif %}
+      </div>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap">
+      <a class="btn btn-outline" href="/orders/">Back</a>
+      <a class="btn btn-outline" href="/orders/{{ order.id }}/edit/">Edit</a>
+      <form method="post" action="/orders/{{ order.id }}/allocate/">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="/orders/{{ order.id }}/" />
+        <button class="btn btn-primary" type="submit" {% if order.on_hold %}disabled{% endif %}>Allocate order</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><div class="card-title">Order info</div></div>
+    <div class="card-body">
+      <p><strong>Phone:</strong> {{ order.customer_phone|default:"—" }}</p>
+      <p><strong>Address:</strong> {{ order.delivery_address|default:"—"|linebreaksbr }}</p>
+    </div>
+  </div>
+
+  <div style="height:14px"></div>
+
+  <div class="card">
+    <div class="card-header"><div class="card-title">Items</div></div>
+    <div class="card-body" style="padding:0">
+      <table style="width:100%; border-collapse:collapse">
+        <thead>
+          <tr style="background:var(--bg); border-bottom:1px solid var(--border)">
+            <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">SKU</th>
+            <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Name</th>
+            <th style="text-align:right; padding:12px 16px; font-size:12px; color:var(--text-muted)">Qty</th>
+            <th style="text-align:right; padding:12px 16px; font-size:12px; color:var(--text-muted)">Allocated</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for it in order.items.all %}
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:12px 16px; font-family:var(--mono)">{{ it.sku.sku_code }}</td>
+              <td style="padding:12px 16px">{{ it.sku.name }}</td>
+              <td style="padding:12px 16px; text-align:right; font-family:var(--mono)">{{ it.quantity }}</td>
+              <td style="padding:12px 16px; text-align:right; font-family:var(--mono)">{{ it.allocated_quantity }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div style="height:14px"></div>
+
+  <div class="card">
+    <div class="card-header"><div class="card-title">Pick tasks</div></div>
+    <div class="card-body" style="padding:0">
+      <table style="width:100%; border-collapse:collapse">
+        <thead>
+          <tr style="background:var(--bg); border-bottom:1px solid var(--border)">
+            <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Task</th>
+            <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">SKU</th>
+            <th style="text-align:right; padding:12px 16px; font-size:12px; color:var(--text-muted)">Qty</th>
+            <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Location</th>
+            <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Picker</th>
+            <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in order.pick_tasks.all %}
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:12px 16px; font-family:var(--mono)">PT{{ t.id }}</td>
+              <td style="padding:12px 16px; font-family:var(--mono)">{{ t.sku.sku_code }}</td>
+              <td style="padding:12px 16px; text-align:right; font-family:var(--mono)">{{ t.quantity }}</td>
+              <td style="padding:12px 16px; font-family:var(--mono)">{{ t.source_location }}</td>
+              <td style="padding:12px 16px">{{ t.picker.get_full_name|default:t.picker.username }}</td>
+              <td style="padding:12px 16px"><span class="badge badge-info">{{ t.get_status_display }}</span></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" style="padding:16px" class="muted">No pick tasks. Run allocation.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}

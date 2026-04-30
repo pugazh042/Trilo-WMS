@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — Create Order{% endblock %}
+{% block header_title %}Create Order{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div class="page-title">Create Order</div>
+    <div class="page-subtitle">Enter customer + SKU lines</div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <form method="post" id="orderForm">
+        {% csrf_token %}
+        <div class="form-group">
+          <label class="form-label" for="customer_name">Customer name</label>
+          <input class="form-control" id="customer_name" name="customer_name" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="delivery_address">Delivery address</label>
+          <textarea class="form-control" id="delivery_address" name="delivery_address" rows="3"></textarea>
+        </div>
+
+        <hr class="divider"/>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+          <div style="font-weight:800">Order Items</div>
+          <button class="btn btn-outline btn-sm" type="button" onclick="addLine()">+ Add line</button>
+        </div>
+
+        <div id="lines" style="display:grid; gap:12px; margin-top:12px"></div>
+
+        <hr class="divider"/>
+        <div style="display:flex; gap:10px; justify-content:flex-end">
+          <a class="btn btn-ghost" href="/orders/">Cancel</a>
+          <button class="btn btn-primary" type="submit">Create</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const skuOptions = `
+      {% for s in skus %}
+        <option value="{{ s.id }}">{{ s.sku_code }} — {{ s.name }}</option>
+      {% endfor %}
+    `;
+
+    function addLine() {
+      const wrap = document.createElement('div');
+      wrap.className = 'card';
+      wrap.style.padding = '12px';
+      wrap.innerHTML = `
+        <div style="display:grid; grid-template-columns: 1fr 120px 44px; gap:10px; align-items:end">
+          <div class="form-group" style="margin:0">
+            <label class="form-label">SKU</label>
+            <select class="form-control" name="sku_id" required>
+              <option value="">Select SKU</option>
+              ${skuOptions}
+            </select>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Qty</label>
+            <input class="form-control" type="number" min="1" name="qty" required />
+          </div>
+          <button class="btn btn-outline" type="button" title="Remove" onclick="this.closest('.card').remove()">✕</button>
+        </div>
+      `;
+      document.getElementById('lines').appendChild(wrap);
+    }
+
+    addLine();
+  </script>
+{% endblock %}
+

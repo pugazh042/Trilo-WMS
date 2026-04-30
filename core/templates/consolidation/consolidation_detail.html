@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — Consolidate {{ order.order_id }}{% endblock %}
+{% block header_title %}Consolidation{% endblock %}
+
+{% block content %}
+  <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px">
+    <div>
+      <div class="page-title">{{ order.order_id }}</div>
+      <div class="page-subtitle">Verify picked lines · {{ consolidation.get_status_display }}</div>
+    </div>
+    <form method="post" action="/consolidation/{{ order.id }}/send-packing/">
+      {% csrf_token %}
+      <button class="btn btn-primary" type="submit" {% if consolidation.status != 'pending' %}disabled{% endif %}>Send to packing</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><div class="card-title">Picked items</div></div>
+    <div class="card-body" style="padding:0">
+      <table style="width:100%; border-collapse:collapse">
+        <thead>
+          <tr style="background:var(--bg); border-bottom:1px solid var(--border)">
+            <th style="text-align:left; padding:12px 16px">SKU</th>
+            <th style="text-align:right; padding:12px 16px">Picked</th>
+            <th style="text-align:left; padding:12px 16px">From</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in picks %}
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:12px 16px; font-family:var(--mono)">{{ p.sku.sku_code }}</td>
+              <td style="padding:12px 16px; text-align:right">{{ p.picked_qty }}</td>
+              <td style="padding:12px 16px; font-family:var(--mono)">{{ p.source_location }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}

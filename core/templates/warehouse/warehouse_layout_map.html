@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Warehouse Layout Map{% endblock %}
+{% block header_title %}Warehouse Layout Map{% endblock %}
+{% block content %}
+<div class="card"><div class="card-body">
+  <div class="page-subtitle">Visual placeholder for warehouse layout map.</div>
+  {% for w in warehouses %}<div style="margin-top:8px;padding:10px;background:#faf5ff;border-radius:8px">{{ w.code }} - {{ w.name }}</div>{% endfor %}
+</div></div>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — Dock Arrival{% endblock %}
+{% block header_title %}Dock Arrival{% endblock %}
+
+{% block content %}
+  <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap">
+    <div>
+      <div class="page-title">{{ po.po_number }}</div>
+      <div class="page-subtitle">{{ po.supplier_name }} · <span class="badge badge-info">{{ po.get_status_display }}</span></div>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap">
+      <a class="btn btn-outline" href="/inbound/">Back</a>
+      <a class="btn btn-outline" href="/inbound/{{ po.id }}/receipt/">Goods receipt</a>
+      <a class="btn btn-outline" href="/inbound/{{ po.id }}/qc/">QC</a>
+      <a class="btn btn-outline" href="/inbound/{{ po.id }}/staging/">Staging</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <div class="stepper">
+        <span class="step active">Enter Dock</span><span class="step">Scan SKU</span><span class="step">Receive Batch/Qty</span><span class="step">Staging</span><span class="step">QC</span><span class="step">Put-away</span>
+      </div>
+      <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+          <label class="form-label" for="dock_number">Assign dock</label>
+          <input class="form-control" id="dock_number" name="dock_number" value="{{ po.dock_number }}" placeholder="e.g. Dock-3" />
+        </div>
+        <div style="display:flex; justify-content:flex-end">
+          <button class="btn btn-primary" type="submit">Mark Arrived</button>
+        </div>
+      </form>
+      <p class="muted" style="margin-top:10px">This will move the PO to “Arrived” (if it was Created).</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        <a class="btn btn-outline btn-sm" href="/inbound/{{ po.id }}/scan/">Scan barcode / enter SKU</a>
+        <a class="btn btn-outline btn-sm" href="/inbound/{{ po.id }}/receipt/">Enter batch & received qty</a>
+        <a class="btn btn-outline btn-sm" href="/inbound/{{ po.id }}/staging/">Send to staging</a>
+        <a class="btn btn-outline btn-sm" href="/inbound/{{ po.id }}/qc/">Move to QC</a>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+

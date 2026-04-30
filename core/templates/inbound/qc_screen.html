@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — QC{% endblock %}
+{% block header_title %}Quality Check{% endblock %}
+
+{% block content %}
+  <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap">
+    <div>
+      <div class="page-title">{{ po.po_number }}</div>
+      <div class="page-subtitle">Passed + Failed must equal Received. Rejected lines highlight in crimson.</div>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap">
+      <a class="btn btn-outline" href="/inbound/{{ po.id }}/receipt/">Receipt</a>
+      <a class="btn btn-outline" href="/inbound/{{ po.id }}/staging/">Staging</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        <div class="form-group" style="max-width:240px">
+          <label class="form-label" for="staging_zone">Staging zone</label>
+          <input class="form-control" id="staging_zone" name="staging_zone" value="STG-A" />
+        </div>
+
+        <table style="width:100%; border-collapse:collapse">
+          <thead>
+            <tr style="background:var(--bg); border-bottom:1px solid var(--border)">
+              <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">SKU</th>
+              <th style="text-align:right; padding:12px 16px; font-size:12px; color:var(--text-muted)">Received</th>
+              <th style="text-align:right; padding:12px 16px; font-size:12px; color:var(--text-muted)">Passed</th>
+              <th style="text-align:right; padding:12px 16px; font-size:12px; color:var(--text-muted)">Failed</th>
+              <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for qc in checks %}
+              <tr style="border-bottom:1px solid var(--border); {% if qc.status == 'rejected' %}background:#fff1f2{% endif %}">
+                <td style="padding:12px 16px; font-family:var(--mono)">{{ qc.sku.sku_code }}</td>
+                <td style="padding:12px 16px; text-align:right; font-family:var(--mono)">{{ qc.received_qty }}</td>
+                <td style="padding:12px 16px; text-align:right">
+                  <input class="form-control" style="max-width:140px; margin-left:auto" type="number" min="0" max="{{ qc.received_qty }}" name="pass_{{ qc.id }}" value="{{ qc.passed_qty }}" />
+                </td>
+                <td style="padding:12px 16px; text-align:right">
+                  <input class="form-control" style="max-width:140px; margin-left:auto" type="number" min="0" max="{{ qc.received_qty }}" name="fail_{{ qc.id }}" value="{{ qc.failed_qty }}" />
+                </td>
+                <td style="padding:12px 16px">
+                  <span class="badge {% if qc.status == 'rejected' %}badge-danger{% elif qc.status == 'approved' %}badge-success{% else %}badge-warning{% endif %}">
+                    {{ qc.get_status_display }}
+                  </span>
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="5" style="padding:16px" class="muted">No received lines to QC.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <div style="display:flex; justify-content:flex-end; margin-top:14px">
+          <button class="btn btn-primary" type="submit">Approve QC → Staging</button>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endblock %}
+

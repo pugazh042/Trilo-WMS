@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — Inbound{% endblock %}
+{% block header_title %}Inbound (Purchase Orders){% endblock %}
+
+{% block content %}
+  <div class="stepper">
+    <span class="step active">PO Created</span><span class="step">Arrived</span><span class="step">Receiving</span><span class="step">QC</span><span class="step">Staging</span><span class="step">Completed</span>
+  </div>
+  <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap">
+    <div>
+      <div class="page-title">Inbound</div>
+      <div class="page-subtitle">Purchase Orders → Receiving → QC → Staging → Put-away</div>
+    </div>
+    <a class="btn btn-primary" href="/inbound/create/">Create PO</a>
+  </div>
+
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      <table style="width:100%; border-collapse:collapse">
+        <thead>
+          <tr style="background:var(--bg); border-bottom:1px solid var(--border)">
+            <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">PO</th>
+            <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Supplier</th>
+            <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Expected</th>
+            <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Status</th>
+            <th style="text-align:right; padding:12px 16px; font-size:12px; color:var(--text-muted)">Open</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for po in orders %}
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:12px 16px; font-family:var(--mono); font-weight:700">{{ po.po_number }}</td>
+              <td style="padding:12px 16px">{{ po.supplier_name }}</td>
+              <td style="padding:12px 16px" class="muted">{{ po.expected_delivery_date|default:"—" }}</td>
+              <td style="padding:12px 16px"><span class="badge badge-info">{{ po.get_status_display }}</span></td>
+              <td style="padding:12px 16px; text-align:right">
+                <a class="btn btn-primary btn-sm" href="/inbound/{{ po.id }}/dock/">View</a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5" style="padding:16px" class="muted">No purchase orders yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}
+

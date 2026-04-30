@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — Pick Task PT{{ task.id }}{% endblock %}
+{% block header_title %}Pick Task PT{{ task.id }}{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div class="page-title">Execute Pick</div>
+    <div class="page-subtitle">Order #{{ task.order.id }} · SKU {{ task.order_item.sku.sku_code }} · Qty {{ task.required_qty }}</div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <div class="badge badge-purple" style="margin-bottom:10px">
+        Expected Bin: <strong style="font-family:var(--mono)">{{ task.stock_bin.location.code }}</strong>
+      </div>
+      <div class="badge badge-info" style="margin-bottom:18px">
+        Expected SKU: <strong style="font-family:var(--mono)">{{ task.order_item.sku.sku_code }}</strong>
+      </div>
+
+      <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+          <label class="form-label" for="bin_code">Step 1 — Scan/enter Bin</label>
+          <input class="form-control" id="bin_code" name="bin_code" placeholder="e.g. A-Z1-B2" required autofocus />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="sku_code">Step 2 — Scan/enter SKU</label>
+          <input class="form-control" id="sku_code" name="sku_code" placeholder="e.g. SKU-0001" required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="qty">Step 3 — Enter picked quantity</label>
+          <input class="form-control" id="qty" name="qty" type="number" min="1" max="{{ task.required_qty }}" required />
+        </div>
+
+        <div style="display:flex; gap:10px; justify-content:flex-end">
+          <a class="btn btn-ghost" href="/picking/">Back</a>
+          <button class="btn btn-primary" type="submit">Confirm Pick ✓</button>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endblock %}
+

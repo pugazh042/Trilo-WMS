@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — Role permissions{% endblock %}
+{% block header_title %}Role permissions{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div class="page-title">Role permissions</div>
+    <div class="page-subtitle">Placeholder screen (use Django permissions for fine-grained control)</div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <div style="display:grid; gap:10px; max-width:560px">
+        {% for k,v in roles %}
+          <div class="card" style="padding:12px">
+            <div style="font-weight:800">{{ v }}</div>
+            <div class="muted">Current access is enforced by server-side role guards.</div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+{% endblock %}
+

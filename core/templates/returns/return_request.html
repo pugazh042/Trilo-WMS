@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — Return request{% endblock %}
+{% block header_title %}Return request{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div class="page-title">Create return request</div>
+    <div class="page-subtitle">Select an order and provide a reason</div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+          <label class="form-label" for="order_id">Order</label>
+          <select class="form-control" id="order_id" name="order_id" required>
+            <option value="">Select order</option>
+            {% for o in orders %}
+              <option value="{{ o.id }}">{{ o.order_id }} — {{ o.customer_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="reason">Reason</label>
+          <textarea class="form-control" id="reason" name="reason" rows="3" required></textarea>
+        </div>
+        <div style="display:flex; gap:10px; justify-content:flex-end">
+          <a class="btn btn-ghost" href="/returns/">Cancel</a>
+          <button class="btn btn-primary" type="submit">Submit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endblock %}
+

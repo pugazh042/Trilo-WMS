@@ -1,0 +1,143 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}Trilo WMS{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/base.css' %}"/>
+  <script defer src="{% static 'js/main.js' %}"></script>
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  {% if messages %}
+    <div class="toast-wrap">
+      {% for message in messages %}
+        <div class="toast toast-{{ message.tags|default:'info' }}">{{ message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% block layout %}
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-icon"><img src="{% static 'images/TriloLogo.png' %}" alt="Trilo WMS" width="32" height="32" /></div>
+        <div>
+          <div class="logo-text">Trilo WMS</div>
+          <div class="logo-sub">Warehouse</div>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section-label">Main</div>
+        <a class="nav-item {% if request.path == '/dashboard/' %}active{% endif %}" href="/dashboard/">
+          <span class="nav-icon">⊞</span> Dashboard
+        </a>
+        {% if request.user.role == 'manager' %}
+          <a class="nav-item {% if request.path|slice:":11" == '/warehouse/' %}active{% endif %}" href="/warehouse/">
+            <span class="nav-icon">🏭</span> Warehouse Setup
+          </a>
+          <a class="nav-item {% if request.path|slice:":11" == '/inventory/' %}active{% endif %}" href="/inventory/">
+            <span class="nav-icon">📦</span> Inventory
+          </a>
+          <a class="nav-item {% if request.path|slice:":9" == '/inbound/' %}active{% endif %}" href="/inbound/">
+            <span class="nav-icon">📥</span> Inbound
+          </a>
+          <a class="nav-item {% if request.path|slice:":18" == '/inbound/putaway/' %}active{% endif %}" href="/inbound/putaway/tasks/">
+            <span class="nav-icon">🧭</span> Put-away
+          </a>
+          <a class="nav-item {% if request.path|slice:":8" == '/orders/' %}active{% endif %}" href="/orders/">
+            <span class="nav-icon">📋</span> Orders
+          </a>
+          <a class="nav-item {% if request.path|slice:":12" == '/allocation/' %}active{% endif %}" href="/allocation/">
+            <span class="nav-icon">🎯</span> Allocation
+          </a>
+          <a class="nav-item {% if request.path|slice:":15" == '/consolidation/' %}active{% endif %}" href="/consolidation/">
+            <span class="nav-icon">🧩</span> Consolidation
+          </a>
+          <a class="nav-item {% if request.path|slice:":10" == '/shipping/' %}active{% endif %}" href="/shipping/">
+            <span class="nav-icon">🚚</span> Shipping
+          </a>
+          <a class="nav-item {% if request.path|slice:":9" == '/returns/' %}active{% endif %}" href="/returns/">
+            <span class="nav-icon">↩</span> Returns
+          </a>
+        {% endif %}
+        {% if request.user.role == 'admin' %}
+          <a class="nav-item {% if request.path|slice:":11" == '/inventory/' %}active{% endif %}" href="/inventory/">
+            <span class="nav-icon">📦</span> Inventory
+          </a>
+          <a class="nav-item {% if request.path|slice:":9" == '/inbound/' %}active{% endif %}" href="/inbound/">
+            <span class="nav-icon">📥</span> Inbound
+          </a>
+          <a class="nav-item {% if request.path|slice:":8" == '/orders/' %}active{% endif %}" href="/orders/">
+            <span class="nav-icon">📋</span> Orders
+          </a>
+          <a class="nav-item {% if request.path|slice:":12" == '/allocation/' %}active{% endif %}" href="/allocation/">
+            <span class="nav-icon">🎯</span> Allocation
+          </a>
+          <a class="nav-item {% if request.path|slice:":10" == '/shipping/' %}active{% endif %}" href="/shipping/">
+            <span class="nav-icon">🚚</span> Shipping
+          </a>
+          <a class="nav-item {% if request.path|slice:":9" == '/returns/' %}active{% endif %}" href="/returns/">
+            <span class="nav-icon">↩</span> Returns
+          </a>
+          <a class="nav-item {% if request.path|slice:":7" == '/users/' %}active{% endif %}" href="/users/">
+            <span class="nav-icon">👥</span> Users
+          </a>
+          <a class="nav-item {% if request.path|slice:":16" == '/settings/roles/' %}active{% endif %}" href="/settings/roles/">
+            <span class="nav-icon">🛡</span> Role Permissions
+          </a>
+          <a class="nav-item {% if request.path|slice:":17" == '/settings/system/' %}active{% endif %}" href="/settings/system/">
+            <span class="nav-icon">⚙</span> System Settings
+          </a>
+        {% endif %}
+        {% if request.user.role == 'picker' %}
+          <a class="nav-item {% if request.path|slice:":9" == '/picking/' %}active{% endif %}" href="/picking/">
+            <span class="nav-icon">🧾</span> Picking
+          </a>
+        {% endif %}
+        {% if request.user.role == 'packer' %}
+          <a class="nav-item {% if request.path|slice:":9" == '/packing/' %}active{% endif %}" href="/packing/queue/">
+            <span class="nav-icon">📦</span> Packing
+          </a>
+        {% endif %}
+        {% if request.user.role == 'putaway' %}
+          <a class="nav-item {% if request.path|slice:":18" == '/inbound/putaway/' %}active{% endif %}" href="/inbound/putaway/tasks/">
+            <span class="nav-icon">📥</span> Put-away Tasks
+          </a>
+        {% endif %}
+        <div class="nav-section-label">Account</div>
+        <a class="nav-item {% if request.path == '/profile/' %}active{% endif %}" href="/profile/">
+          <span class="nav-icon">👤</span> Profile
+        </a>
+        <a class="nav-item" href="/logout/"><span class="nav-icon">⎋</span> Logout</a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <a class="sidebar-user" href="/profile/">
+          <div class="user-avatar">{{ request.user.get_full_name|default:request.user.username|slice:":2"|upper }}</div>
+          <div class="user-info">
+            <div class="user-name">{{ request.user.get_full_name|default:request.user.username }}</div>
+            <div class="user-role">{{ request.user.role|default:"" }}</div>
+          </div>
+        </a>
+      </div>
+    </aside>
+
+    <header class="header">
+      <div style="flex:1">
+        <div class="header-title">{% block header_title %}Dashboard{% endblock %}</div>
+        <div class="header-breadcrumb">{% block header_subtitle %}{{ today_str }}{% endblock %}</div>
+      </div>
+      <div class="header-actions">
+        <a class="header-btn" href="/profile/" title="Profile">👤</a>
+      </div>
+    </header>
+
+    <main class="main">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+  {% endblock %}
+</body>
+</html>

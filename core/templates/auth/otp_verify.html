@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — OTP Verification{% endblock %}
+{% block body_class %}auth-shell{% endblock %}
+{% block layout %}
+  <div class="auth-shell">
+    <div class="auth-card">
+      <div class="auth-title">OTP Verification</div>
+      <div class="auth-sub">We sent a 6-digit code to <strong>{{ masked }}</strong></div>
+
+      <form method="post" id="otpForm">
+        {% csrf_token %}
+        <div class="otp-inputs" role="group" aria-label="OTP input">
+          <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" aria-label="Digit 1"/>
+          <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" aria-label="Digit 2"/>
+          <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" aria-label="Digit 3"/>
+          <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" aria-label="Digit 4"/>
+          <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" aria-label="Digit 5"/>
+          <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" aria-label="Digit 6"/>
+        </div>
+
+        <input type="hidden" name="otp_code" id="otpValue"/>
+
+        <button class="btn btn-primary btn-full btn-lg" type="submit" id="verifyBtn" disabled>Verify →</button>
+      </form>
+
+      <div style="margin-top:14px; display:flex; align-items:center; gap:10px; justify-content:center;">
+        <button class="btn btn-outline btn-sm" id="resendBtn" disabled>Resend OTP</button>
+        <span class="muted" id="timer" data-remaining="{{ resend_remaining|default:30 }}"></span>
+      </div>
+
+      <hr class="divider"/>
+      <a class="muted" href="/">← Back to login</a>
+    </div>
+  </div>
+{% endblock %}

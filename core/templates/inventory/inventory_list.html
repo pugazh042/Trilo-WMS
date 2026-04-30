@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Inventory List{% endblock %}
+{% block header_title %}Inventory List{% endblock %}
+{% block content %}
+<div class="page-header" style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><div class="page-title">Inventory By Bin (Read-only)</div><div style="display:flex;gap:8px"><a class="btn btn-outline" href="/inventory/skus/">SKU List</a><a class="btn btn-outline" href="/inventory/barcode/">Barcode</a><a class="btn btn-outline" href="/inventory/adjustment/">Stock Adjustment</a></div></div>
+<div class="card" style="margin-bottom:12px"><div class="card-body">
+  <form method="get" style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px">
+    <select class="form-control" name="warehouse"><option value="">All Warehouses</option>{% for w in warehouses %}<option value="{{ w.id }}" {% if warehouse_filter == w.id|stringformat:"s" %}selected{% endif %}>{{ w.code }}</option>{% endfor %}</select>
+    <select class="form-control" name="zone"><option value="">All Zones</option>{% for z in zones %}<option value="{{ z.id }}" {% if zone_filter == z.id|stringformat:"s" %}selected{% endif %}>{{ z.code }}</option>{% endfor %}</select>
+    <select class="form-control" name="category"><option value="">All Categories</option>{% for c in categories %}<option value="{{ c }}" {% if category_filter == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
+    <button class="btn btn-outline" type="submit">Filter</button>
+  </form>
+</div></div>
+<div class="card"><div class="card-body" style="padding:0">
+  <table style="width:100%;border-collapse:collapse">
+    <thead><tr style="background:var(--bg);border-bottom:1px solid var(--border)"><th style="padding:12px 16px;text-align:left">SKU</th><th style="padding:12px 16px;text-align:left">Category</th><th style="padding:12px 16px;text-align:left">Location</th><th style="padding:12px 16px;text-align:right">Qty</th><th style="padding:12px 16px;text-align:left">Status</th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:12px 16px;font-family:var(--mono)">{{ r.sku.sku_code }}</td>
+        <td style="padding:12px 16px">{{ r.sku.category }}</td>
+        <td style="padding:12px 16px;font-family:var(--mono)">{{ r.warehouse.code }} → {{ r.zone.code }} → {{ r.bin.rack.rack_number }} → L{{ r.bin.level.level_number|default:r.bin.level_number }} → {{ r.bin.bin_code }}</td>
+        <td style="padding:12px 16px;text-align:right;font-family:var(--mono)">{{ r.quantity }}</td>
+        <td style="padding:12px 16px"><span class="badge {% if r.status == 'damaged' %}badge-danger{% else %}badge-success{% endif %}">{{ r.get_status_display }}</span></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" style="padding:16px" class="muted">No inventory. Inventory appears only after inbound -> put-away.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div></div>
+{% endblock %}

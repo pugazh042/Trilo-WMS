@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — Login{% endblock %}
+{% block body_class %}auth-shell{% endblock %}
+{% block layout %}
+  <div class="auth-shell">
+    <div class="auth-card">
+      <div class="auth-title">Welcome back</div>
+      <div class="auth-sub">Login → OTP Verification → Dashboard</div>
+
+      <form method="post" id="loginForm">
+        {% csrf_token %}
+
+        <div class="form-group">
+          <label class="form-label" for="identifier">Email / Employee ID</label>
+          <div class="input-group">
+            <span class="input-icon">✉</span>
+            <input class="form-control" type="text" id="identifier" name="identifier"
+                   value="{{ identifier|default:'' }}"
+                   placeholder="you@company.com or EMP-0001" autocomplete="username" required />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">Password</label>
+          <div class="input-group">
+            <span class="input-icon">🔒</span>
+            <input class="form-control" type="password" id="password" name="password"
+                   placeholder="Enter your password" autocomplete="current-password" required />
+            <button class="input-suffix" type="button" onclick="(function(){const p=document.getElementById('password');p.type=p.type==='password'?'text':'password'})()">👁</button>
+          </div>
+        </div>
+
+        <div class="form-group" style="display:flex;justify-content:space-between;align-items:center">
+          <label style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--text-secondary)">
+            <input type="checkbox" name="remember_me"/> Remember me (30 days)
+          </label>
+          <span class="muted">Forgot password: contact Admin</span>
+        </div>
+
+        <button class="btn btn-primary btn-full btn-lg" type="submit">Login →</button>
+      </form>
+    </div>
+  </div>
+{% endblock %}

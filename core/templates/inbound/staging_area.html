@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — Staging{% endblock %}
+{% block header_title %}Staging Area{% endblock %}
+
+{% block content %}
+  <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap">
+    <div>
+      <div class="page-title">{{ po.po_number }}</div>
+      <div class="page-subtitle">Approved items waiting for put-away</div>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap">
+      <a class="btn btn-outline" href="/inbound/{{ po.id }}/dock/">Dock</a>
+      <a class="btn btn-outline" href="/inbound/{{ po.id }}/receipt/">Receipt</a>
+      <a class="btn btn-outline" href="/inbound/{{ po.id }}/qc/">QC</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      <table style="width:100%; border-collapse:collapse">
+        <thead>
+          <tr style="background:var(--bg); border-bottom:1px solid var(--border)">
+            <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">SKU</th>
+            <th style="text-align:right; padding:12px 16px; font-size:12px; color:var(--text-muted)">Qty</th>
+            <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Zone</th>
+            <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in staging %}
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:12px 16px; font-family:var(--mono)">{{ s.sku.sku_code }}</td>
+              <td style="padding:12px 16px; text-align:right; font-family:var(--mono)">{{ s.quantity }}</td>
+              <td style="padding:12px 16px; font-family:var(--mono)">{{ s.staging_zone }}</td>
+              <td style="padding:12px 16px"><span class="badge badge-purple">{{ s.get_status_display }}</span></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" style="padding:16px" class="muted">No staging items yet. Complete QC first.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div style="display:flex; justify-content:flex-end; margin-top:14px">
+    <form method="post" action="/inbound/{{ po.id }}/staging/create-putaway/">
+      {% csrf_token %}
+      <button class="btn btn-primary" type="submit">Create Put-away Tasks</button>
+    </form>
+  </div>
+{% endblock %}
+

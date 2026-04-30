@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — Profile{% endblock %}
+{% block header_title %}My Profile{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div class="page-title">Profile</div>
+    <div class="page-subtitle">Your account details</div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <div style="display:grid; gap:10px; max-width:520px">
+        <div><strong>Name:</strong> {{ request.user.get_full_name|default:request.user.username }}</div>
+        <div><strong>Employee ID:</strong> {{ request.user.employee_id }}</div>
+        <div><strong>Role:</strong> {{ request.user.role }}</div>
+        {% if request.user.warehouse %}
+          <div><strong>Warehouse:</strong> {{ request.user.warehouse }}</div>
+        {% endif %}
+      </div>
+
+      <hr class="divider"/>
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap">
+        <a class="btn btn-outline" href="/admin/password_change/">Change password</a>
+        <a class="btn btn-primary" href="/logout/">Logout</a>
+      </div>
+    </div>
+  </div>
+{% endblock %}

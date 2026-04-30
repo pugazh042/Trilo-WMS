@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — Return inspection{% endblock %}
+{% block header_title %}Return inspection{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div class="page-title">{{ ret.order.order_id }}</div>
+    <div class="page-subtitle">Inspect and update return status</div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+          <label class="form-label" for="status">Status</label>
+          <select class="form-control" id="status" name="status">
+            {% for k,v in ret.Status.choices %}
+              <option value="{{ k }}" {% if ret.status == k %}selected{% endif %}>{{ v }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="inspection_notes">Inspection notes</label>
+          <textarea class="form-control" id="inspection_notes" name="inspection_notes" rows="4">{{ ret.inspection_notes }}</textarea>
+        </div>
+        <div style="display:flex; gap:10px; justify-content:flex-end">
+          <a class="btn btn-ghost" href="/returns/">Back</a>
+          <button class="btn btn-primary" type="submit">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endblock %}
+

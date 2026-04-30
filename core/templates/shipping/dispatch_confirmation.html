@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — Dispatch confirmation{% endblock %}
+{% block header_title %}Dispatch confirmation{% endblock %}
+
+{% block content %}
+  <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap">
+    <div>
+      <div class="page-title">{{ order.order_id }}</div>
+      <div class="page-subtitle">Step 3/3 · Confirm dispatch</div>
+    </div>
+    <a class="btn btn-outline" href="/shipping/">Back to queue</a>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px">
+        <div>
+          <div class="muted">Carrier</div>
+          <div style="font-weight:800">{{ shipment.carrier|default:"—" }}</div>
+        </div>
+        <div>
+          <div class="muted">Estimated delivery</div>
+          <div style="font-weight:800">{{ shipment.estimated_delivery|default:"—" }}</div>
+        </div>
+        <div>
+          <div class="muted">Truck</div>
+          <div style="font-weight:800">{{ ta.truck_number|default:"—" }}</div>
+        </div>
+        <div>
+          <div class="muted">Dock</div>
+          <div style="font-weight:800">{{ ta.dock_number|default:"—" }}</div>
+        </div>
+      </div>
+
+      <hr class="divider"/>
+
+      <div style="font-weight:800; margin-bottom:10px">Shipment items</div>
+      <table style="width:100%; border-collapse:collapse">
+        <thead>
+          <tr style="background:var(--bg); border-bottom:1px solid var(--border)">
+            <th style="text-align:left; padding:12px 16px">SKU</th>
+            <th style="text-align:right; padding:12px 16px">Qty</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for it in items %}
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:12px 16px; font-family:var(--mono)">{{ it.sku.sku_code }}</td>
+              <td style="padding:12px 16px; text-align:right; font-family:var(--mono)">{{ it.quantity }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <form method="post" style="display:flex; justify-content:flex-end; margin-top:14px" onsubmit="return confirm('Confirm dispatch and generate tracking ID?');">
+        {% csrf_token %}
+        <button class="btn btn-primary" type="submit">Confirm dispatch ✓</button>
+      </form>
+    </div>
+  </div>
+{% endblock %}
+

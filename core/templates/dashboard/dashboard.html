@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — {% if module_title %}{{ module_title }}{% else %}Dashboard{% endif %}{% endblock %}
+{% block header_title %}{% if module_title %}{{ module_title }}{% else %}Dashboard{% endif %}{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <div class="page-title">Welcome, {{ request.user.first_name|default:request.user.username }}</div>
+      <div class="page-subtitle">Role: <strong>{{ request.user.role }}</strong></div>
+    </div>
+  </div>
+
+  <div class="summary-grid" style="display:grid;grid-template-columns:repeat(4,minmax(180px,1fr));gap:14px">
+    <div class="card" style="padding:18px">
+      <div style="font-weight:800; color:var(--text-secondary); font-size:13px">Total Orders</div>
+      <div style="font-family:var(--mono); font-size:30px; font-weight:800">{{ total_orders|default:"—" }}</div>
+    </div>
+    <div class="card" style="padding:18px">
+      <div style="font-weight:800; color:var(--text-secondary); font-size:13px">Orders Completed</div>
+      <div style="font-family:var(--mono); font-size:30px; font-weight:800">{{ picks_done|default:"—" }}</div>
+    </div>
+    <div class="card" style="padding:18px">
+      <div style="font-weight:800; color:var(--text-secondary); font-size:13px">Low Stock Items</div>
+      <div style="font-family:var(--mono); font-size:30px; font-weight:800">{{ low_stock|default:"—" }}</div>
+    </div>
+    <div class="card" style="padding:18px">
+      <div style="font-weight:800; color:var(--text-secondary); font-size:13px">Active Workers</div>
+      <div style="font-family:var(--mono); font-size:30px; font-weight:800">{{ active_workers|default:"—" }}</div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-top:16px">
+    <div class="card"><div class="card-body"><canvas id="ordersLine"></canvas></div></div>
+    <div class="card"><div class="card-body"><canvas id="statusDonut"></canvas></div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-top:16px">
+    <div class="card"><div class="card-body"><canvas id="moduleBar"></canvas></div></div>
+    <div class="card">
+      <div class="card-body">
+        <div class="card-title" style="margin-bottom:10px">Low stock items</div>
+        <table style="width:100%;border-collapse:collapse">
+          {% for item in low_stock_items %}
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:8px 4px;font-family:var(--mono)">{{ item.sku_code }}</td>
+              <td style="padding:8px 4px">{{ item.name }}</td>
+              <td style="padding:8px 4px;text-align:right;color:var(--danger);font-weight:700">{{ item.quantity }}</td>
+            </tr>
+          {% empty %}
+            <tr><td class="muted">No low stock items.</td></tr>
+          {% endfor %}
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const ordersOverTime = JSON.parse('{{ orders_over_time_json|escapejs }}');
+    const moduleTasks = JSON.parse('{{ module_tasks_json|escapejs }}');
+    const orderStatus = JSON.parse('{{ order_status_json|escapejs }}');
+
+    new Chart(document.getElementById('ordersLine'), {
+      type: 'line',
+      data: { labels: ordersOverTime.map(x => x.date), datasets: [{ label: 'Orders', data: ordersOverTime.map(x => x.count), borderColor: '#7c3aed', backgroundColor: '#7c3aed22', fill: true, tension: .3 }] }
+    });
+    new Chart(document.getElementById('moduleBar'), {
+      type: 'bar',
+      data: { labels: ['Inbound','Picking','Packing','Shipping'], datasets: [{ label: 'Tasks', data: [moduleTasks.inbound, moduleTasks.picking, moduleTasks.packing, moduleTasks.shipping], backgroundColor: ['#8b5cf6','#6366f1','#7c3aed','#4f46e5'] }] }
+    });
+    new Chart(document.getElementById('statusDonut'), {
+      type: 'doughnut',
+      data: { labels: ['Pending','Allocated','Packing','Completed'], datasets: [{ data: [orderStatus.pending, orderStatus.allocated, orderStatus.packing, orderStatus.completed], backgroundColor: ['#f59e0b','#6366f1','#7c3aed','#22c55e'] }] }
+    });
+  </script>
+{% endblock %}

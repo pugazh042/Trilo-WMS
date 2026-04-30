@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — Put-away{% endblock %}
+{% block header_title %}Put-away tasks{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div class="page-title">{% if can_confirm_putaway %}My Put-away Tasks{% else %}Put-away Tasks{% endif %}</div>
+    <div class="page-subtitle">
+      {% if can_confirm_putaway %}
+        Confirm put-away to update stock
+      {% else %}
+        Monitor put-away tasks assigned to workers
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      <table style="width:100%; border-collapse:collapse">
+        <thead>
+          <tr style="background:var(--bg); border-bottom:1px solid var(--border)">
+            <th style="text-align:left; padding:12px 16px">PO</th>
+            <th style="text-align:left; padding:12px 16px">SKU</th>
+            <th style="text-align:right; padding:12px 16px">Qty</th>
+            <th style="text-align:left; padding:12px 16px">Assigned to</th>
+            <th style="text-align:left; padding:12px 16px">Suggested bin</th>
+            <th style="text-align:right; padding:12px 16px">Done</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in tasks %}
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:12px 16px; font-family:var(--mono)">{{ t.purchase_order.po_number }}</td>
+              <td style="padding:12px 16px; font-family:var(--mono)">{{ t.sku.sku_code }}</td>
+              <td style="padding:12px 16px; text-align:right; font-family:var(--mono)">{{ t.quantity }}</td>
+              <td style="padding:12px 16px">
+                {{ t.assigned_to.get_full_name|default:t.assigned_to.username|default:"Unassigned" }}
+              </td>
+              <td style="padding:12px 16px; font-family:var(--mono)">{{ t.suggested_location.code|default:"—" }}</td>
+              <td style="padding:12px 16px; text-align:right">
+                {% if can_confirm_putaway %}
+                  {% if bins %}
+                    <form method="post" action="/inbound/putaway/tasks/{{ t.id }}/complete/">
+                      {% csrf_token %}
+                      <select class="form-control" name="bin_id" style="min-width:240px; margin-bottom:8px">
+                        {% for b in bins %}
+                          <option value="{{ b.id }}" {% if t.suggested_bin_id == b.id %}selected{% endif %}>{{ b.bin_code }}</option>
+                        {% endfor %}
+                      </select>
+                      <button class="btn btn-primary btn-sm" type="submit">Confirm</button>
+                    </form>
+                  {% else %}
+                    <span class="muted">No bins configured yet</span>
+                  {% endif %}
+                {% else %}
+                  {% if bins %}
+                    <form method="post" action="/inbound/putaway/tasks/{{ t.id }}/suggested-bin/" style="display:flex; gap:8px; justify-content:flex-end; align-items:center">
+                      {% csrf_token %}
+                      <select class="form-control" name="suggested_bin_id" style="min-width:220px">
+                        {% for b in bins %}
+                          <option value="{{ b.id }}" {% if t.suggested_bin_id == b.id %}selected{% endif %}>{{ b.bin_code }}</option>
+                        {% endfor %}
+                      </select>
+                      <button class="btn btn-outline btn-sm" type="submit">Update suggestion</button>
+                    </form>
+                  {% else %}
+                    <span class="muted">No bins configured yet</span>
+                  {% endif %}
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" style="padding:16px" class="muted">No put-away tasks assigned.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}
+

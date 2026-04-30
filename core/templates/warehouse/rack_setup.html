@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Rack Setup{% endblock %}
+{% block header_title %}Rack Setup{% endblock %}
+{% block content %}
+<div class="card"><div class="card-body"><form method="post">{% csrf_token %}
+<div class="form-group"><label class="form-label">Zone</label><select class="form-control" name="zone_id">{% for z in zones %}<option value="{{ z.id }}">{{ z.warehouse.code }}-{{ z.code }}</option>{% endfor %}</select></div>
+<div class="form-group"><label class="form-label">Rack Number</label><input class="form-control" name="rack_number" placeholder="R1"></div>
+<div class="form-group"><label class="form-label">Levels</label><input class="form-control" type="number" name="levels" value="3"></div>
+<div class="form-group"><label class="form-label">Max Capacity</label><input class="form-control" type="number" name="max_capacity" value="100"></div>
+<button class="btn btn-primary" type="submit">Save Rack</button>
+</form></div></div>
+{% endblock %}

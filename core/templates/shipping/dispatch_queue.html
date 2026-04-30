@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — Shipping{% endblock %}
+{% block header_title %}Dispatch{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div class="page-title">Dispatch queue</div>
+    <div class="page-subtitle">Packed orders awaiting carrier</div>
+  </div>
+
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      <table style="width:100%; border-collapse:collapse">
+        <thead>
+          <tr style="background:var(--bg); border-bottom:1px solid var(--border)">
+            <th style="text-align:left; padding:12px 16px">Order</th>
+            <th style="text-align:left; padding:12px 16px">Customer</th>
+            <th style="text-align:right; padding:12px 16px">Ship</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for o in orders %}
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:12px 16px; font-family:var(--mono); font-weight:700">{{ o.order_id }}</td>
+              <td style="padding:12px 16px">{{ o.customer_name }}</td>
+              <td style="padding:12px 16px; text-align:right"><a class="btn btn-primary btn-sm" href="/shipping/{{ o.id }}/carrier/">Start Dispatch</a></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="3" style="padding:16px" class="muted">No orders to dispatch.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}

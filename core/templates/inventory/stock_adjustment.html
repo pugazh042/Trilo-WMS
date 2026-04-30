@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Stock Adjustment{% endblock %}
+{% block header_title %}Stock Adjustment{% endblock %}
+{% block content %}
+<div class="card"><div class="card-body">
+  <form method="post">{% csrf_token %}
+    <div class="form-group"><label class="form-label">Scan / Enter SKU Code</label><input class="form-control" id="scanSku" placeholder="Scan barcode or type SKU code"></div>
+    <div class="form-group"><label class="form-label">SKU</label><select class="form-control" name="sku_id">{% for s in skus %}<option value="{{ s.id }}">{{ s.sku_code }} — {{ s.name }}</option>{% endfor %}</select></div>
+    <div class="form-group"><label class="form-label">Bin</label><select class="form-control" name="bin_id">{% for b in bins %}<option value="{{ b.id }}">{{ b.bin_code }}</option>{% endfor %}</select></div>
+    <div class="form-group"><label class="form-label">Adjustment Type</label><select class="form-control" name="adjustment_type"><option value="add">Add</option><option value="remove">Remove</option></select></div>
+    <div class="form-group"><label class="form-label">Quantity</label><input class="form-control" type="number" name="quantity" required></div>
+    <div class="form-group"><label class="form-label">Reason</label><textarea class="form-control" name="reason" rows="3"></textarea></div>
+    <button class="btn btn-primary" type="submit">Adjust</button>
+  </form>
+</div></div>
+<script>
+document.getElementById('scanSku')?.addEventListener('change', function(){
+  const code = this.value.trim().toUpperCase();
+  const sel = document.querySelector('select[name=\"sku_id\"]');
+  for(const opt of sel.options){ if(opt.textContent.toUpperCase().startsWith(code + ' ' ) || opt.textContent.toUpperCase().startsWith(code + '—') || opt.textContent.toUpperCase().startsWith(code)){ sel.value = opt.value; break; } }
+});
+</script>
+{% endblock %}

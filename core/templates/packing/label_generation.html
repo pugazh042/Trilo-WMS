@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Label — {{ order.order_id }}{% endblock %}
+{% block header_title %}Label{% endblock %}
+
+{% block content %}
+  <div class="card">
+    <div class="card-body">
+      <p class="page-title" style="font-size:18px">Shipping label (demo)</p>
+      <div style="border:2px dashed var(--border); border-radius:var(--radius); padding:24px; max-width:360px; font-family:var(--mono)">
+        <div style="font-weight:800; color:var(--primary)">TRILO WMS</div>
+        <div style="margin-top:12px">{{ order.order_id }}</div>
+        <div style="margin-top:8px">{{ order.customer_name }}</div>
+        <div style="margin-top:8px; font-size:12px">{{ order.delivery_address|truncatewords:20 }}</div>
+        <div style="margin-top:16px; font-size:12px" class="muted">{{ packing.label_text|default:"LBL pending" }}</div>
+      </div>
+      <form method="post" style="margin-top:16px">
+        {% csrf_token %}
+        <a class="btn btn-ghost" href="/packing/{{ order.id }}/process/">Back</a>
+        <button class="btn btn-primary" type="submit">Mark Packed & Move to Shipping</button>
+      </form>
+    </div>
+  </div>
+{% endblock %}

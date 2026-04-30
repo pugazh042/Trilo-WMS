@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — PT{{ task.id }}{% endblock %}
+{% block header_title %}Pick PT{{ task.id }}{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div class="page-title">Execute pick</div>
+    <div class="page-subtitle">Order {{ task.order.order_id }} · {{ task.sku.sku_code }} · qty {{ task.quantity }}</div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <p><strong>Location:</strong> <span style="font-family:var(--mono)">{{ task.source_location }}</span></p>
+      <p><strong>SKU:</strong> <span style="font-family:var(--mono)">{{ task.sku.sku_code }}</span></p>
+      <p><strong>Required qty:</strong> {{ task.quantity }}</p>
+
+      <hr class="divider"/>
+
+      <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+          <label class="form-label" for="bin_code">Scan bin</label>
+          <input class="form-control" id="bin_code" name="bin_code" placeholder="Bin code" required autofocus />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="sku_code">Scan SKU</label>
+          <input class="form-control" id="sku_code" name="sku_code" placeholder="SKU code" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="qty">Quantity</label>
+          <input class="form-control" id="qty" name="qty" type="number" min="1" max="{{ task.quantity }}" required />
+        </div>
+        <div style="display:flex; gap:10px; justify-content:flex-end">
+          <a class="btn btn-ghost" href="/picking/">Back</a>
+          <button class="btn btn-primary" type="submit">Confirm pick</button>
+        </div>
+      </form>
+
+      <hr class="divider"/>
+
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="issue" />
+        <div class="form-group">
+          <label class="form-label" for="issue_note">Report issue</label>
+          <textarea class="form-control" id="issue_note" name="issue_note" rows="2" required placeholder="Describe the problem"></textarea>
+        </div>
+        <div style="display:flex; justify-content:flex-end">
+          <button class="btn btn-outline" type="submit">Report issue</button>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endblock %}

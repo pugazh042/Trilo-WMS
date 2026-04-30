@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Packing Process{% endblock %}
+{% block header_title %}Packing Process{% endblock %}
+{% block content %}
+<div class="stepper">
+  <span class="step active">Verify</span><span class="step active">Box</span><span class="step active">Pack</span><span class="step">Label</span>
+</div>
+<div class="split-grid">
+  <div class="card"><div class="card-body">
+    <form method="post">{% csrf_token %}
+      {% for item in order.items.all %}
+      <div class="form-group">
+        <label class="form-label">{{ item.sku.sku_code }} expected {{ item.quantity }}</label>
+        <input class="form-control {% if mismatch %}error{% endif %}" type="number" min="0" name="packed_{{ item.id }}" value="{{ item.quantity }}">
+      </div>
+      {% endfor %}
+      <button class="btn btn-primary" type="submit">Validate & Continue</button>
+    </form>
+  </div></div>
+  <div class="card"><div class="card-body"><span class="badge {% if mismatch %}badge-danger{% else %}badge-success{% endif %}">{% if mismatch %}Mismatch detected{% else %}No mismatch{% endif %}</span></div></div>
+</div>
+{% endblock %}

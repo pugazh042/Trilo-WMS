@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Packaging Hierarchy{% endblock %}
+{% block header_title %}Packaging Hierarchy{% endblock %}
+{% block content %}
+<div class="card"><div class="card-body">
+  <div class="page-subtitle" style="margin-bottom:12px">Unit → Box → Carton → Pallet</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;max-width:760px">
+    <div class="form-group"><label class="form-label">Units per box</label><input class="form-control" type="number" value="10"></div>
+    <div class="form-group"><label class="form-label">Boxes per carton</label><input class="form-control" type="number" value="5"></div>
+    <div class="form-group"><label class="form-label">Cartons per pallet</label><input class="form-control" type="number" value="20"></div>
+  </div>
+  <button class="btn btn-primary" type="button">Save Hierarchy</button>
+</div></div>
+{% endblock %}

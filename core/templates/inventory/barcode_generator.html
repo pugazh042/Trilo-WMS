@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Barcode Generator{% endblock %}
+{% block header_title %}Barcode Generator{% endblock %}
+{% block content %}
+<div class="card"><div class="card-body">
+  <div class="form-group"><label class="form-label">SKU</label><select class="form-control" id="skuSel">{% for s in rows %}<option value="{{ s.sku_code }}">{{ s.sku_code }} — {{ s.name }}</option>{% endfor %}</select></div>
+  <div class="form-group"><label class="form-label">Barcode Format</label><select class="form-control" id="fmt"><option value="CODE128">CODE128</option><option value="EAN13">EAN13</option></select></div>
+  <div class="card" style="padding:16px;margin:12px 0"><div id="barcodePreview" style="font-family:var(--mono);font-size:20px;letter-spacing:2px">||||| SKU |||||</div></div>
+  <div style="display:flex;gap:8px"><button class="btn btn-primary" type="button" onclick="gen()">Generate</button><button class="btn btn-outline" type="button" onclick="window.print()">Print</button></div>
+</div></div>
+<script>
+function gen(){const sku=document.getElementById('skuSel').value;const fmt=document.getElementById('fmt').value;document.getElementById('barcodePreview').textContent=`${fmt} :: || ${sku} ||`;}
+</script>
+{% endblock %}

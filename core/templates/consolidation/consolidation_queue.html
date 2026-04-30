@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — Consolidation{% endblock %}
+{% block header_title %}Consolidation queue{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div class="page-title">Ready for consolidation</div>
+    <div class="page-subtitle">All picks completed for these orders</div>
+  </div>
+
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      <table style="width:100%; border-collapse:collapse">
+        <thead>
+          <tr style="background:var(--bg); border-bottom:1px solid var(--border)">
+            <th style="text-align:left; padding:12px 16px">Order</th>
+            <th style="text-align:left; padding:12px 16px">Status</th>
+            <th style="text-align:right; padding:12px 16px">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in rows %}
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:12px 16px; font-family:var(--mono); font-weight:700">{{ c.order.order_id }}</td>
+              <td style="padding:12px 16px"><span class="badge badge-info">{{ c.get_status_display }}</span></td>
+              <td style="padding:12px 16px; text-align:right"><a class="btn btn-primary btn-sm" href="/consolidation/{{ c.order.id }}/">Open</a></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="3" style="padding:16px" class="muted">No orders in consolidation.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}

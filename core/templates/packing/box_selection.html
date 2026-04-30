@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Box Selection{% endblock %}
+{% block header_title %}Box Selection{% endblock %}
+{% block content %}
+<div class="stepper">
+  <span class="step active">Verify</span><span class="step active">Box</span><span class="step">Pack</span><span class="step">Label</span>
+</div>
+<div class="card"><div class="card-body">
+  <form method="post">{% csrf_token %}
+    <label class="form-label">Select Box</label>
+    <select class="form-control" name="box_type" required>
+      <option value="">Choose...</option>
+      <option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option>
+    </select>
+    <div style="margin-top:14px"><button class="btn btn-primary" type="submit">Next: Pack Items</button></div>
+  </form>
+</div></div>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Packing Order Detail{% endblock %}
+{% block header_title %}Packing Order Detail{% endblock %}
+{% block content %}
+<div class="stepper">
+  <span class="step active">Verify</span><span class="step {% if packing.verification_status %}active{% endif %}">Box</span><span class="step {% if packing.is_box_selected %}active{% endif %}">Pack</span><span class="step {% if packing.label_text %}active{% endif %}">Label</span>
+</div>
+<div class="card"><div class="card-body">
+  <div class="page-title">{{ order.order_id }}</div>
+  <p class="page-subtitle">Verify items before continuing.</p>
+  <form method="post">{% csrf_token %}
+    <input type="hidden" name="verify" value="1">
+    <button class="btn btn-primary" type="submit">Verify Items</button>
+    <a class="btn btn-outline {% if not packing.verification_status %}disabled{% endif %}" href="/packing/{{ order.id }}/box/">Next: Select Box</a>
+  </form>
+</div></div>
+{% endblock %}

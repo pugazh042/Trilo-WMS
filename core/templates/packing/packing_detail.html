@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — Pack {{ order.order_id }}{% endblock %}
+{% block header_title %}Pack order{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div class="page-title">{{ order.order_id }}</div>
+    <div class="page-subtitle">Select box · verify · complete</div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+          <label class="form-label" for="box_type">Box type</label>
+          <select class="form-control" id="box_type" name="box_type" required>
+            <option value="">Choose…</option>
+            <option value="small">Small</option>
+            <option value="medium">Medium</option>
+            <option value="large">Large</option>
+            <option value="pallet">Pallet</option>
+          </select>
+        </div>
+        <div style="display:flex; gap:10px; justify-content:flex-end">
+          <a class="btn btn-outline" href="/packing/{{ order.id }}/label/">Preview label</a>
+          <button class="btn btn-primary" type="submit">Complete packing</button>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endblock %}

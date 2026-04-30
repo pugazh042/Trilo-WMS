@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — Create user{% endblock %}
+{% block header_title %}Create user{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div class="page-title">Create user</div>
+    <div class="page-subtitle">Assign role + employee ID</div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+          <label class="form-label" for="username">Username</label>
+          <input class="form-control" id="username" name="username" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="email">Email</label>
+          <input class="form-control" id="email" name="email" type="email" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="employee_id">Employee ID</label>
+          <input class="form-control" id="employee_id" name="employee_id" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="role">Role</label>
+          <select class="form-control" id="role" name="role">
+            {% for k,v in roles %}
+              <option value="{{ k }}">{{ v }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="warehouse">Warehouse (optional)</label>
+          <input class="form-control" id="warehouse" name="warehouse" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="password">Password</label>
+          <input class="form-control" id="password" name="password" type="password" required />
+        </div>
+        <div style="display:flex; gap:10px; justify-content:flex-end">
+          <a class="btn btn-ghost" href="/users/">Cancel</a>
+          <button class="btn btn-primary" type="submit">Create</button>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endblock %}
+
