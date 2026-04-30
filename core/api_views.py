@@ -94,6 +94,17 @@ def zone_update_api(request, zone_id: int):
 
 @login_required
 @role_required("admin", "manager")
+@require_http_methods(["POST"])
+def zone_delete_api(request, zone_id: int):
+    row = get_object_or_404(Zone, pk=zone_id)
+    if row.racks.exists():
+        return JsonResponse({"ok": False, "error": "Cannot delete zone with existing racks."})
+    row.delete()
+    return JsonResponse({"ok": True})
+
+
+@login_required
+@role_required("admin", "manager")
 def zone_list_api(request):
     qs = Zone.objects.order_by("warehouse_id", "code")
     wid = request.GET.get("warehouse_id")
@@ -135,6 +146,17 @@ def rack_update_api(request, rack_id: int):
 
 @login_required
 @role_required("admin", "manager")
+@require_http_methods(["POST"])
+def rack_delete_api(request, rack_id: int):
+    row = get_object_or_404(Rack, pk=rack_id)
+    if Bin.objects.filter(level__rack=row).exists():
+        return JsonResponse({"ok": False, "error": "Cannot delete rack with existing bins."})
+    row.delete()
+    return JsonResponse({"ok": True})
+
+
+@login_required
+@role_required("admin", "manager")
 def rack_list_api(request):
     qs = Rack.objects.order_by("zone_id", "rack_number")
     zid = request.GET.get("zone_id")
@@ -158,10 +180,26 @@ def level_create_api(request):
 @require_http_methods(["POST"])
 def bin_update_api(request, bin_id: int):
     row = get_object_or_404(Bin, pk=bin_id)
-    row.max_capacity = max(0, int(request.POST.get("max_capacity") or row.max_capacity))
+    max_capacity = int(request.POST.get("max_capacity") or row.max_capacity)
+    
+    if max_capacity > 0 and max_capacity < row.current_capacity:
+        return JsonResponse({"ok": False, "error": f"Cannot set capacity lower than current usage ({row.current_capacity})."})
+        
+    row.max_capacity = max_capacity
     row.size = request.POST.get("size") or row.size
     row.save(update_fields=["max_capacity", "size"])
     return JsonResponse({"ok": True, "data": bin_serializer(row)})
+
+
+@login_required
+@role_required("admin", "manager")
+@require_http_methods(["POST"])
+def bin_delete_api(request, bin_id: int):
+    row = get_object_or_404(Bin, pk=bin_id)
+    if row.current_capacity > 0:
+        return JsonResponse({"ok": False, "error": "Cannot delete a bin that contains items."})
+    row.delete()
+    return JsonResponse({"ok": True})
 
 
 @login_required

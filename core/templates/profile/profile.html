@@ -8,23 +8,106 @@
     <div class="page-subtitle">Your account details</div>
   </div>
 
-  <div class="card">
-    <div class="card-body">
-      <div style="display:grid; gap:10px; max-width:520px">
-        <div><strong>Name:</strong> {{ request.user.get_full_name|default:request.user.username }}</div>
-        <div><strong>Employee ID:</strong> {{ request.user.employee_id }}</div>
-        <div><strong>Role:</strong> {{ request.user.role }}</div>
-        {% if request.user.warehouse %}
-          <div><strong>Warehouse:</strong> {{ request.user.warehouse }}</div>
-        {% endif %}
+  <div class="split-grid" style="align-items: start;">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Profile Information</div>
       </div>
+      <div class="card-body">
+        <form method="post" enctype="multipart/form-data" action="/profile/">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="update_profile">
+          <div style="display:flex; gap:20px; align-items:center; margin-bottom: 24px;">
+            <div style="position:relative; width: 80px; height: 80px;">
+              {% if request.user.profile_photo %}
+                <img id="photoPreview" src="{{ request.user.profile_photo.url }}" style="width:100%; height:100%; object-fit:cover; border-radius:50%; border:2px solid var(--border);">
+              {% else %}
+                <div id="photoPreviewPlaceholder" style="width:100%; height:100%; background:var(--primary-ghost); border-radius:50%; border:2px solid var(--border); display:grid; place-items:center; font-size: 24px; color:var(--primary); font-weight:700;">
+                  {{ request.user.get_full_name|default:request.user.username|slice:":2"|upper }}
+                </div>
+                <img id="photoPreview" src="" style="width:100%; height:100%; object-fit:cover; border-radius:50%; border:2px solid var(--border); display:none;">
+              {% endif %}
+            </div>
+            <div>
+              <label class="btn btn-outline btn-sm" style="cursor:pointer;">
+                Upload new photo
+                <input type="file" name="profile_photo" id="photoInput" style="display:none;" accept="image/*">
+              </label>
+              <div style="font-size:12px; color:var(--text-muted); margin-top:6px;">JPG, GIF or PNG. Max size 2MB.</div>
+            </div>
+          </div>
 
-      <hr class="divider"/>
+          <div style="display:grid; gap:10px;">
+            <div><strong>Name:</strong> {{ request.user.get_full_name|default:request.user.username }}</div>
+            <div><strong>Employee ID:</strong> {{ request.user.employee_id }}</div>
+            <div><strong>Role:</strong> <span style="text-transform: capitalize;">{{ request.user.role }}</span></div>
+            {% if request.user.warehouse %}
+              <div><strong>Warehouse:</strong> {{ request.user.warehouse }}</div>
+            {% endif %}
+          </div>
 
-      <div style="display:flex; gap:10px; flex-wrap:wrap">
-        <a class="btn btn-outline" href="/admin/password_change/">Change password</a>
-        <a class="btn btn-primary" href="/logout/">Logout</a>
+          <div style="margin-top:24px;">
+            <button type="submit" class="btn btn-primary">Save Profile Changes</button>
+            <a class="btn btn-outline" href="/logout/" style="margin-left: 8px;">Logout</a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Security</div>
+      </div>
+      <div class="card-body">
+        <button type="button" class="btn btn-outline" id="togglePasswordBtn">Change Password</button>
+        
+        <form id="passwordForm" method="post" action="/profile/" style="display:none; margin-top:20px; padding-top:20px; border-top:1px solid var(--border);">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="change_password">
+          <div class="form-group">
+            <label class="form-label">Current Password</label>
+            <input type="password" name="current_password" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">New Password</label>
+            <input type="password" name="new_password" class="form-control" required minlength="8">
+            <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Minimum 8 characters.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Confirm New Password</label>
+            <input type="password" name="confirm_password" class="form-control" required minlength="8">
+          </div>
+          <button type="submit" class="btn btn-primary">Update Password</button>
+          <button type="button" class="btn btn-ghost" id="cancelPasswordBtn" style="margin-left: 8px;">Cancel</button>
+        </form>
       </div>
     </div>
   </div>
+
+  <script>
+    document.getElementById('photoInput').addEventListener('change', function(event) {
+      if(event.target.files && event.target.files[0]) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          var preview = document.getElementById('photoPreview');
+          var placeholder = document.getElementById('photoPreviewPlaceholder');
+          preview.src = e.target.result;
+          preview.style.display = 'block';
+          if(placeholder) placeholder.style.display = 'none';
+        }
+        reader.readAsDataURL(event.target.files[0]);
+      }
+    });
+
+    document.getElementById('togglePasswordBtn').addEventListener('click', function() {
+      document.getElementById('passwordForm').style.display = 'block';
+      this.style.display = 'none';
+    });
+
+    document.getElementById('cancelPasswordBtn').addEventListener('click', function() {
+      document.getElementById('passwordForm').style.display = 'none';
+      document.getElementById('togglePasswordBtn').style.display = 'inline-block';
+      document.getElementById('passwordForm').reset();
+    });
+  </script>
 {% endblock %}

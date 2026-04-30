@@ -5,6 +5,7 @@ from __future__ import annotations
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
@@ -30,28 +31,58 @@ def _suggested_location_for_sku(sku_id: int) -> Location | None:
     return Location.objects.order_by("code").first()
 
 
-def _suggested_bin_for_sku(quantity: int = 0) -> Bin | None:
-    bins = Bin.objects.select_related("level__rack__zone__warehouse").order_by("current_capacity", "bin_code")
-    if quantity <= 0:
-        return bins.first()
-    for b in bins:
+def _suggested_bin_for_sku(quantity: int = 0, sku_category: str = "") -> Bin | None:
+    qs = Bin.objects.select_related("level__rack__zone__warehouse").order_by("current_capacity", "bin_code")
+    
+    # Try finding a bin in a zone that matches the SKU category
+    if sku_category:
+        category_bins = qs.filter(level__rack__zone__category__iexact=sku_category)
+        for b in category_bins:
+            if b.max_capacity == 0 or (b.max_capacity - b.current_capacity) >= quantity:
+                return b
+
+    # Fallback to any available bin
+    for b in qs:
         # max_capacity=0 is treated as no configured cap.
         if b.max_capacity == 0 or (b.max_capacity - b.current_capacity) >= quantity:
             return b
-    return bins.first()
+    return qs.first()
 
 
 @login_required
 @role_required("admin", "manager")
 def inbound_po_list(request):
     qs = PurchaseOrder.objects.all().order_by("-created_at")
+    
     st = request.GET.get("status") or ""
+    date_start = request.GET.get("date_start") or ""
+    date_end = request.GET.get("date_end") or ""
+    supplier = request.GET.get("supplier") or ""
+    search = request.GET.get("search") or ""
+
     if st:
         qs = qs.filter(status=st)
+    if date_start:
+        qs = qs.filter(created_at__date__gte=date_start)
+    if date_end:
+        qs = qs.filter(created_at__date__lte=date_end)
+    if supplier:
+        qs = qs.filter(supplier_name__icontains=supplier)
+    if search:
+        qs = qs.filter(Q(po_number__icontains=search) | Q(supplier_name__icontains=search))
+
     return render(
         request,
         "inbound/inbound_po_list.html",
-        {"orders": qs[:200], "status_filter": st, "today_str": now_date_str()},
+        {
+            "orders": qs[:200],
+            "status_filter": st,
+            "date_start": date_start,
+            "date_end": date_end,
+            "supplier": supplier,
+            "search": search,
+            "today_str": now_date_str()
+        },
     )
 
 
@@ -85,6 +116,16 @@ def create_po(request):
     messages.success(request, f"PO {po.po_number} created.")
     return redirect(f"/inbound/{po.id}/")
 
+
+@login_required
+@role_required("admin", "manager")
+def inbound_dock_arrival_list(request):
+    # POs that are created and waiting for arrival, or already arrived but not fully received
+    qs = PurchaseOrder.objects.filter(status__in=[PurchaseOrder.Status.CREATED, PurchaseOrder.Status.ARRIVED, PurchaseOrder.Status.RECEIVING]).order_by("-created_at")
+    return render(request, "inbound/inbound_dock_arrival_list.html", {
+        "orders": qs,
+        "today_str": now_date_str()
+    })
 
 @login_required
 @role_required("admin", "manager")
@@ -183,6 +224,17 @@ def barcode_scan_view(request, po_id: int):
         "inbound/barcode_scan.html",
         {"po": po, "gr": gr, "scan_result": scan_result, "today_str": now_date_str()},
     )
+
+
+@login_required
+@role_required("admin", "manager")
+def inbound_qc_list(request):
+    # POs that are arrived/receiving and have completed goods receipts waiting for QC
+    qs = PurchaseOrder.objects.filter(status=PurchaseOrder.Status.QC).order_by("-created_at")
+    return render(request, "inbound/inbound_qc_list.html", {
+        "orders": qs,
+        "today_str": now_date_str()
+    })
 
 
 @login_required
@@ -288,7 +340,7 @@ def create_putaway_tasks(request, po_id: int):
             status=StagingItem.Status.READY_FOR_PUTAWAY,
         ):
             loc = _suggested_location_for_sku(st.sku_id)
-            suggested_bin = _suggested_bin_for_sku(st.quantity)
+            suggested_bin = _suggested_bin_for_sku(st.quantity, st.sku.category)
             assign = workers[idx % len(workers)] if workers else None
             idx += 1
             InboundPutawayTask.objects.create(
@@ -373,6 +425,11 @@ def inbound_putaway_complete(request, task_id: int):
         if not target_bin:
             messages.error(request, "Bin is required for put-away.")
             return redirect("/inbound/putaway/tasks/")
+            
+        if target_bin.max_capacity > 0 and (target_bin.current_capacity + task.quantity) > target_bin.max_capacity:
+            messages.error(request, f"Cannot put-away {task.quantity} items into {target_bin.bin_code}. Capacity exceeded.")
+            return redirect("/inbound/putaway/tasks/")
+            
         loc = task.suggested_location
         if not loc:
             # Fallback for setups where Location rows are not pre-seeded.

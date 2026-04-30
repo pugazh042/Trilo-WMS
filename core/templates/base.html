@@ -63,12 +63,30 @@
           </a>
         {% endif %}
         {% if request.user.role == 'admin' %}
-          <a class="nav-item {% if request.path|slice:":11" == '/inventory/' %}active{% endif %}" href="/inventory/">
-            <span class="nav-icon">📦</span> Inventory
-          </a>
-          <a class="nav-item {% if request.path|slice:":9" == '/inbound/' %}active{% endif %}" href="/inbound/">
-            <span class="nav-icon">📥</span> Inbound
-          </a>
+          <div class="nav-dropdown">
+            <button class="nav-item nav-dropdown-btn {% if request.path|slice:":11" == '/inventory/' %}active{% endif %}">
+              <span class="nav-icon">📦</span> Inventory
+              <span class="nav-dropdown-arrow">▼</span>
+            </button>
+            <div class="nav-dropdown-content">
+              <a class="nav-dropdown-item {% if request.path == '/inventory/' %}active{% endif %}" href="/inventory/">Inventory List</a>
+              <a class="nav-dropdown-item {% if request.path == '/inventory/barcode/' %}active{% endif %}" href="/inventory/barcode/">Barcode Generator</a>
+              <a class="nav-dropdown-item {% if request.path == '/inventory/adjustment/' %}active{% endif %}" href="/inventory/adjustment/">Stock Adjustment</a>
+            </div>
+          </div>
+          
+          <div class="nav-dropdown">
+            <button class="nav-item nav-dropdown-btn {% if request.path|slice:":9" == '/inbound/' %}active{% endif %}">
+              <span class="nav-icon">📥</span> Inbound
+              <span class="nav-dropdown-arrow">▼</span>
+            </button>
+            <div class="nav-dropdown-content">
+              <a class="nav-dropdown-item {% if request.path == '/inbound/' %}active{% endif %}" href="/inbound/">PO List</a>
+              <a class="nav-dropdown-item {% if request.path == '/inbound/dock-arrival/' %}active{% endif %}" href="/inbound/dock-arrival/">Dock Arrival & Receipt</a>
+              <a class="nav-dropdown-item {% if request.path == '/inbound/qc/' %}active{% endif %}" href="/inbound/qc/">QC</a>
+              <a class="nav-dropdown-item {% if request.path == '/inbound/putaway/tasks/' %}active{% endif %}" href="/inbound/putaway/tasks/">Put Away Tasks</a>
+            </div>
+          </div>
           <a class="nav-item {% if request.path|slice:":8" == '/orders/' %}active{% endif %}" href="/orders/">
             <span class="nav-icon">📋</span> Orders
           </a>
@@ -115,7 +133,13 @@
 
       <div class="sidebar-footer">
         <a class="sidebar-user" href="/profile/">
-          <div class="user-avatar">{{ request.user.get_full_name|default:request.user.username|slice:":2"|upper }}</div>
+          {% if request.user.profile_photo %}
+            <div class="user-avatar" style="padding:0; overflow:hidden;">
+              <img src="{{ request.user.profile_photo.url }}" style="width:100%; height:100%; object-fit:cover;">
+            </div>
+          {% else %}
+            <div class="user-avatar">{{ request.user.get_full_name|default:request.user.username|slice:":2"|upper }}</div>
+          {% endif %}
           <div class="user-info">
             <div class="user-name">{{ request.user.get_full_name|default:request.user.username }}</div>
             <div class="user-role">{{ request.user.role|default:"" }}</div>
@@ -125,12 +149,21 @@
     </aside>
 
     <header class="header">
-      <div style="flex:1">
-        <div class="header-title">{% block header_title %}Dashboard{% endblock %}</div>
-        <div class="header-breadcrumb">{% block header_subtitle %}{{ today_str }}{% endblock %}</div>
+      <div style="display:flex; align-items:center; gap:16px; flex:1">
+        <button id="sidebarToggle" class="header-btn" title="Toggle Sidebar" style="border:none; background:transparent; cursor:pointer; font-size:20px; color:var(--text-primary)">☰</button>
+        <div>
+          <div class="header-title">{% block header_title %}Dashboard{% endblock %}</div>
+          <div class="header-breadcrumb">{% block header_subtitle %}{{ today_str }}{% endblock %}</div>
+        </div>
       </div>
       <div class="header-actions">
-        <a class="header-btn" href="/profile/" title="Profile">👤</a>
+        <a class="header-avatar" href="/profile/" title="Profile">
+          {% if request.user.profile_photo %}
+            <img src="{{ request.user.profile_photo.url }}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">
+          {% else %}
+            👤
+          {% endif %}
+        </a>
       </div>
     </header>
 

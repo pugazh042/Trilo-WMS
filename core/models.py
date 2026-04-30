@@ -15,6 +15,7 @@ class User(AbstractUser):
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.PICKER)
     employee_id = models.CharField(max_length=32, unique=True)
     warehouse = models.CharField(max_length=120, blank=True, null=True)
+    profile_photo = models.ImageField(upload_to="profiles/", blank=True, null=True)
     assigned_warehouse = models.ForeignKey(
         "Warehouse",
         on_delete=models.SET_NULL,
@@ -431,6 +432,7 @@ class Zone(models.Model):
     warehouse = models.ForeignKey(Warehouse, on_delete=models.CASCADE, related_name="zones")
     name = models.CharField(max_length=120)
     code = models.CharField(max_length=20)
+    category = models.CharField(max_length=120, blank=True, default="")
     type = models.CharField(max_length=20, choices=Type.choices, default=Type.BULK)
     temperature = models.CharField(
         max_length=20, choices=Temperature.choices, default=Temperature.NORMAL

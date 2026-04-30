@@ -42,12 +42,12 @@
                   {% if bins %}
                     <form method="post" action="/inbound/putaway/tasks/{{ t.id }}/complete/">
                       {% csrf_token %}
-                      <select class="form-control" name="bin_id" style="min-width:240px; margin-bottom:8px">
-                        {% for b in bins %}
-                          <option value="{{ b.id }}" {% if t.suggested_bin_id == b.id %}selected{% endif %}>{{ b.bin_code }}</option>
-                        {% endfor %}
-                      </select>
-                      <button class="btn btn-primary btn-sm" type="submit">Confirm</button>
+                      {% if t.suggested_bin %}
+                        <div style="margin-bottom:8px; font-weight:600;">Put in: {{ t.suggested_bin.bin_code }}</div>
+                        <button class="btn btn-primary btn-sm" type="submit">Confirm</button>
+                      {% else %}
+                        <span class="muted">No suggested bin available</span>
+                      {% endif %}
                     </form>
                   {% else %}
                     <span class="muted">No bins configured yet</span>

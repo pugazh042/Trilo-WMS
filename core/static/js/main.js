@@ -38,6 +38,33 @@ document.addEventListener('DOMContentLoaded', () => {
     setupOtpInputs();
     setupResend();
   }
+
+  // Sidebar Toggle Logic
+  const sidebarToggle = qs('#sidebarToggle');
+  const layout = qs('.layout');
+  if (sidebarToggle && layout) {
+    const isCollapsed = localStorage.getItem('sidebar_collapsed') === 'true';
+    if (isCollapsed) {
+      layout.classList.add('sidebar-collapsed');
+    }
+
+    sidebarToggle.addEventListener('click', () => {
+      layout.classList.toggle('sidebar-collapsed');
+      localStorage.setItem('sidebar_collapsed', layout.classList.contains('sidebar-collapsed'));
+    });
+  }
+
+  // Dropdown toggles
+  document.querySelectorAll('.nav-dropdown-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const parent = this.closest('.nav-dropdown');
+      parent.classList.toggle('expanded');
+    });
+    
+    if(btn.classList.contains('active')) {
+      btn.closest('.nav-dropdown').classList.add('expanded');
+    }
+  });
 });
 
 function setupOtpInputs() {

@@ -17,7 +17,7 @@
     </div>
     <div class="card" style="padding:18px">
       <div style="font-weight:800; color:var(--text-secondary); font-size:13px">Orders Completed</div>
-      <div style="font-family:var(--mono); font-size:30px; font-weight:800">{{ picks_done|default:"—" }}</div>
+      <div style="font-family:var(--mono); font-size:30px; font-weight:800">{{ completed_orders|default:"0" }}</div>
     </div>
     <div class="card" style="padding:18px">
       <div style="font-weight:800; color:var(--text-secondary); font-size:13px">Low Stock Items</div>
@@ -30,7 +30,25 @@
   </div>
 
   <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-top:16px">
-    <div class="card"><div class="card-body"><canvas id="ordersLine"></canvas></div></div>
+    <div class="card">
+      <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+        <div class="card-title">Orders Over Time</div>
+        <form method="get" style="display:flex; gap:10px; align-items:center;">
+          <select name="graph_days" class="form-control" style="width: auto; padding: 4px 8px; font-size: 12px;" onchange="if(this.value !== 'custom') this.form.submit()">
+            <option value="7" {% if graph_days == '7' %}selected{% endif %}>Last 7 Days</option>
+            <option value="30" {% if graph_days == '30' %}selected{% endif %}>Last 30 Days</option>
+            <option value="custom" {% if graph_start and graph_end %}selected{% endif %}>Custom Range</option>
+          </select>
+          {% if graph_start and graph_end or graph_days == 'custom' %}
+            <input type="date" name="graph_start" class="form-control" style="width: auto; padding: 4px 8px; font-size: 12px;" value="{{ graph_start }}" required>
+            <span>to</span>
+            <input type="date" name="graph_end" class="form-control" style="width: auto; padding: 4px 8px; font-size: 12px;" value="{{ graph_end }}" required>
+            <button type="submit" class="btn btn-primary btn-sm">Go</button>
+          {% endif %}
+        </form>
+      </div>
+      <div class="card-body"><canvas id="ordersLine"></canvas></div>
+    </div>
     <div class="card"><div class="card-body"><canvas id="statusDonut"></canvas></div></div>
   </div>
   <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-top:16px">

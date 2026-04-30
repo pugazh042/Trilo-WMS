@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — Put-away Dashboard{% endblock %}
+{% block header_title %}Put-away Dashboard{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div class="page-title">Welcome, {{ request.user.first_name|default:request.user.username }}</div>
+    <div class="page-subtitle">Role: <strong>{{ request.user.role|title }}</strong></div>
+  </div>
+
+  <div class="summary-grid" style="display:grid;grid-template-columns:repeat(2,minmax(180px,1fr));gap:14px; max-width: 600px; margin-bottom: 24px;">
+    <div class="card" style="padding:18px">
+      <div style="font-weight:800; color:var(--text-secondary); font-size:13px">Active Put-away Tasks</div>
+      <div style="font-family:var(--mono); font-size:30px; font-weight:800">{{ active_tasks|length }}</div>
+    </div>
+    <div class="card" style="padding:18px">
+      <div style="font-weight:800; color:var(--text-secondary); font-size:13px">Completed Put-aways</div>
+      <div style="font-family:var(--mono); font-size:30px; font-weight:800">{{ completed_count }}</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">Your Active Put-away Tasks</div>
+      <a href="/inbound/putaway/tasks/" class="btn btn-outline btn-sm">Go to Put-away List</a>
+    </div>
+    <div class="card-body" style="padding:0">
+      <table style="width:100%; border-collapse:collapse">
+        <tr style="background:var(--bg); border-bottom:1px solid var(--border)">
+          <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">PO</th>
+          <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">SKU</th>
+          <th style="text-align:right; padding:12px 16px; font-size:12px; color:var(--text-muted)">Qty</th>
+          <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Status</th>
+          <th style="text-align:right; padding:12px 16px; font-size:12px; color:var(--text-muted)">Action</th>
+        </tr>
+        {% for task in active_tasks %}
+          <tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:12px 16px; font-family:var(--mono);">{{ task.purchase_order.po_number }}</td>
+            <td style="padding:12px 16px; font-family:var(--mono);">{{ task.sku.sku_code }}</td>
+            <td style="padding:12px 16px; text-align:right;">{{ task.quantity }}</td>
+            <td style="padding:12px 16px;"><span class="badge badge-info">{{ task.get_status_display }}</span></td>
+            <td style="padding:12px 16px; text-align:right;">
+              <a href="/inbound/putaway/tasks/" class="btn btn-primary btn-sm">Process</a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5" style="padding:16px" class="muted">You have no active tasks.</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+  </div>
+{% endblock %}

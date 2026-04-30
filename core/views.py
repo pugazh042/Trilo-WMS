@@ -5,7 +5,10 @@ import json
 from django.contrib import messages
 from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout as auth_logout
+from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Count
 from django.db.models import Q, Sum
@@ -242,30 +245,28 @@ def resend_otp(request):
 @login_required
 def dashboard(request):
     role = (getattr(request.user, "role", "") or "").lower()
-    if role in ("picker", "packer", "putaway"):
-        return render(
-            request,
-            "dashboard/dashboard.html",
-            {
-                "module_title": "My Work",
-                "total_orders": "—",
-                "inventory_count": "—",
-                "low_stock": "—",
-                "active_tasks": request.user.tasks.exclude(status="done").count() if hasattr(request.user, "tasks") else 0,
-                "picks_done": PickTask.objects.filter(picker=request.user, status=PickTask.Status.COMPLETED).count()
-                if role == "picker"
-                else 0,
-                "worker_perf_json": "[]",
-                "module_tasks_json": "{}",
-                "order_status_json": "{}",
-                "orders_over_time_json": "[]",
-                "low_stock_items": [],
-                "active_workers": 1,
-                "today_str": now_date_str(),
-            },
-        )
+    
+    if role == "picker":
+        active_picks = PickTask.objects.filter(picker=request.user, status__in=[PickTask.Status.PENDING, PickTask.Status.IN_PROGRESS])
+        completed_picks = PickTask.objects.filter(picker=request.user, status=PickTask.Status.COMPLETED).count()
+        return render(request, "dashboard/picker.html", {"active_tasks": active_picks, "completed_count": completed_picks, "today_str": now_date_str()})
+        
+    elif role == "packer":
+        pending_packs = Packing.objects.filter(status__in=[Packing.Status.PENDING, Packing.Status.IN_PROGRESS])
+        completed_packs = Packing.objects.filter(packed_by=request.user, status=Packing.Status.COMPLETED).count()
+        return render(request, "dashboard/packer.html", {"active_tasks": pending_packs, "completed_count": completed_packs, "today_str": now_date_str()})
+        
+    elif role == "putaway":
+        open_putaways = InboundPutawayTask.objects.filter(assigned_to=request.user).exclude(status=InboundPutawayTask.Status.DONE)
+        completed_putaways = InboundPutawayTask.objects.filter(assigned_to=request.user, status=InboundPutawayTask.Status.DONE).count()
+        return render(request, "dashboard/putaway.html", {"active_tasks": open_putaways, "completed_count": completed_putaways, "today_str": now_date_str()})
+        
+    if role not in ("admin", "manager"):
+        messages.error(request, "You do not have a valid role.")
+        return redirect("/")
 
     total_orders = Order.objects.count()
+    completed_orders = Order.objects.filter(status=Order.Status.COMPLETED).count()
     inventory_count = Inventory.objects.count()
     low_stock = SKU.objects.filter(quantity__lt=10).count()
     active_tasks = PickTask.objects.filter(
@@ -291,10 +292,34 @@ def dashboard(request):
         "completed": Order.objects.filter(status=Order.Status.COMPLETED).count(),
     }
     orders_over_time = []
-    for i in range(6, -1, -1):
-        d = timezone.localdate() - timezone.timedelta(days=i)
-        cnt = Order.objects.filter(created_at__date=d).count()
-        orders_over_time.append({"date": d.strftime("%d %b"), "count": cnt})
+    
+    graph_start = request.GET.get("graph_start")
+    graph_end = request.GET.get("graph_end")
+    graph_days = request.GET.get("graph_days", "7")
+    
+    if graph_start and graph_end:
+        try:
+            start_dt = timezone.datetime.strptime(graph_start, "%Y-%m-%d").date()
+            end_dt = timezone.datetime.strptime(graph_end, "%Y-%m-%d").date()
+            if start_dt <= end_dt:
+                delta = (end_dt - start_dt).days
+                for i in range(delta, -1, -1):
+                    d = end_dt - timezone.timedelta(days=i)
+                    cnt = Order.objects.filter(created_at__date=d).count()
+                    orders_over_time.append({"date": d.strftime("%d %b"), "count": cnt})
+        except ValueError:
+            pass
+            
+    if not orders_over_time:
+        try:
+            days = int(graph_days)
+        except Exception:
+            days = 7
+        for i in range(days - 1, -1, -1):
+            d = timezone.localdate() - timezone.timedelta(days=i)
+            cnt = Order.objects.filter(created_at__date=d).count()
+            orders_over_time.append({"date": d.strftime("%d %b"), "count": cnt})
+
     low_stock_items = list(SKU.objects.filter(quantity__lt=10).values("sku_code", "name", "quantity")[:10])
 
     return render(
@@ -302,6 +327,7 @@ def dashboard(request):
         "dashboard/dashboard.html",
         {
             "total_orders": total_orders,
+            "completed_orders": completed_orders,
             "inventory_count": inventory_count,
             "low_stock": low_stock,
             "active_tasks": active_tasks,
@@ -310,6 +336,9 @@ def dashboard(request):
             "module_tasks_json": json.dumps(module_tasks),
             "order_status_json": json.dumps(order_status),
             "orders_over_time_json": json.dumps(orders_over_time),
+            "graph_days": graph_days,
+            "graph_start": graph_start or "",
+            "graph_end": graph_end or "",
             "low_stock_items": low_stock_items,
             "active_workers": User.objects.filter(is_active=True).exclude(role=User.Role.ADMIN).count(),
             "today_str": now_date_str(),
@@ -355,7 +384,36 @@ def dashboard_api(request):
 
 
 @login_required
+@require_http_methods(["GET", "POST"])
 def profile(request):
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "change_password":
+            current_pw = request.POST.get("current_password")
+            new_pw = request.POST.get("new_password")
+            confirm_pw = request.POST.get("confirm_password")
+            
+            if not request.user.check_password(current_pw):
+                messages.error(request, "Current password is incorrect.")
+            elif new_pw != confirm_pw:
+                messages.error(request, "New passwords do not match.")
+            else:
+                try:
+                    validate_password(new_pw, request.user)
+                    request.user.set_password(new_pw)
+                    request.user.save()
+                    update_session_auth_hash(request, request.user)
+                    messages.success(request, "Password changed successfully.")
+                except ValidationError as e:
+                    for error in e.messages:
+                        messages.error(request, error)
+        elif action == "update_profile":
+            if "profile_photo" in request.FILES:
+                request.user.profile_photo = request.FILES["profile_photo"]
+                request.user.save()
+                messages.success(request, "Profile photo updated.")
+        return redirect("/profile/")
+        
     return render(request, "profile/profile.html", {"today_str": now_date_str()})
 
 
@@ -369,8 +427,41 @@ def logout_view(request):
 @login_required
 @role_required("admin", "manager")
 def orders_list(request):
-    orders = Order.objects.annotate(items_count=Count("items")).order_by("-created_at")[:200]
-    return render(request, "orders/orders_list.html", {"orders": orders, "today_str": now_date_str()})
+    qs = Order.objects.annotate(items_count=Count("items"))
+
+    st = request.GET.get("status") or ""
+    date_start = request.GET.get("date_start") or ""
+    date_end = request.GET.get("date_end") or ""
+    search = request.GET.get("search") or ""
+    sort_by = request.GET.get("sort_by") or "latest"
+
+    if st:
+        qs = qs.filter(status=st)
+    if date_start:
+        qs = qs.filter(created_at__date__gte=date_start)
+    if date_end:
+        qs = qs.filter(created_at__date__lte=date_end)
+    if search:
+        qs = qs.filter(Q(order_id__icontains=search) | Q(customer_name__icontains=search))
+
+    if sort_by == "oldest":
+        qs = qs.order_by("created_at")
+    else:
+        qs = qs.order_by("-created_at")
+
+    return render(
+        request, 
+        "orders/orders_list.html", 
+        {
+            "orders": qs[:200], 
+            "status_filter": st,
+            "date_start": date_start,
+            "date_end": date_end,
+            "search": search,
+            "sort_by": sort_by,
+            "today_str": now_date_str()
+        }
+    )
 
 
 @login_required
@@ -921,7 +1012,11 @@ def zone_setup(request):
         )
         messages.success(request, "Zone created.")
         return redirect("/warehouse/zones/")
-    return render(request, "warehouse/zone_setup.html", {"warehouses": Warehouse.objects.all(), "today_str": now_date_str()})
+    return render(request, "warehouse/zone_setup.html", {
+        "warehouses": Warehouse.objects.all(), 
+        "zones": Zone.objects.select_related("warehouse").order_by("code"),
+        "today_str": now_date_str()
+    })
 
 
 @login_required
@@ -942,7 +1037,11 @@ def rack_setup(request):
             Level.objects.get_or_create(rack=rack, level_number=i)
         messages.success(request, "Rack created.")
         return redirect("/warehouse/racks/")
-    return render(request, "warehouse/rack_setup.html", {"zones": Zone.objects.select_related("warehouse"), "today_str": now_date_str()})
+    return render(request, "warehouse/rack_setup.html", {
+        "zones": Zone.objects.select_related("warehouse"), 
+        "racks": Rack.objects.select_related("zone__warehouse").order_by("rack_number"),
+        "today_str": now_date_str()
+    })
 
 
 @login_required
@@ -970,17 +1069,14 @@ def bin_configuration(request):
             )
             if created:
                 generated += 1
-        messages.success(request, f"Generated {generated} bins.")
+        messages.success(request, f"{generated} bins generated.")
         return redirect("/warehouse/bins/")
-    return render(
-        request,
-        "warehouse/bin_configuration.html",
-        {
-            "racks": Rack.objects.select_related("zone__warehouse"),
-            "levels": Level.objects.select_related("rack").order_by("rack_id", "level_number"),
-            "today_str": now_date_str(),
-        },
-    )
+    return render(request, "warehouse/bin_configuration.html", {
+        "racks": Rack.objects.select_related("zone__warehouse"), 
+        "levels": Level.objects.select_related("rack").order_by("rack_id", "level_number"),
+        "bins": Bin.objects.select_related("level__rack__zone__warehouse").order_by("bin_code")[:200],
+        "today_str": now_date_str()
+    })
 
 
 @login_required

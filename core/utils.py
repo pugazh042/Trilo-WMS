@@ -98,15 +98,11 @@ def resend_otp_session(*, request) -> str | None:
 def role_home_url(role: str) -> str:
     role = (role or "").lower()
     if role == "admin":
-        return "/users/"
+        return "/dashboard/"
     if role == "manager":
         return "/dashboard/"
-    if role == "picker":
-        return "/picking/"
-    if role == "packer":
-        return "/packing/queue/"
-    if role == "putaway":
-        return "/inbound/putaway/tasks/"
+    if role in ("picker", "packer", "putaway"):
+        return "/dashboard/"
     return "/dashboard/"
 
 

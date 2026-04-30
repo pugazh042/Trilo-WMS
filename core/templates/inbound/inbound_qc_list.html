@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — Quality Control{% endblock %}
+{% block header_title %}Quality Control{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div class="page-title">Quality Control (QC)</div>
+    <div class="page-subtitle">Select an arrived PO to perform quality checks.</div>
+  </div>
+
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      <table style="width:100%; border-collapse:collapse">
+        <tr style="background:var(--bg); border-bottom:1px solid var(--border)">
+          <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">PO Number</th>
+          <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Supplier</th>
+          <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Status</th>
+          <th style="text-align:right; padding:12px 16px; font-size:12px; color:var(--text-muted)">Action</th>
+        </tr>
+        {% for po in orders %}
+          <tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:12px 16px; font-family:var(--mono);">{{ po.po_number }}</td>
+            <td style="padding:12px 16px;">{{ po.supplier_name }}</td>
+            <td style="padding:12px 16px;"><span class="badge badge-primary">Pending QC</span></td>
+            <td style="padding:12px 16px; text-align:right;">
+              <a href="/inbound/{{ po.id }}/qc/" class="btn btn-primary btn-sm">Process QC</a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="4" style="padding:16px" class="muted">No items pending QC.</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+  </div>
+{% endblock %}

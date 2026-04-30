@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — Dock Arrival & Receipt{% endblock %}
+{% block header_title %}Dock Arrival & Receipt{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div class="page-title">Dock Arrival & Goods Receipt</div>
+    <div class="page-subtitle">Select a pending PO to assign a dock and record received goods.</div>
+  </div>
+
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      <table style="width:100%; border-collapse:collapse">
+        <tr style="background:var(--bg); border-bottom:1px solid var(--border)">
+          <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">PO Number</th>
+          <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Supplier</th>
+          <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Status</th>
+          <th style="text-align:right; padding:12px 16px; font-size:12px; color:var(--text-muted)">Action</th>
+        </tr>
+        {% for po in orders %}
+          <tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:12px 16px; font-family:var(--mono);">{{ po.po_number }}</td>
+            <td style="padding:12px 16px;">{{ po.supplier_name }}</td>
+            <td style="padding:12px 16px;">
+              {% if po.status == 'created' %}<span class="badge badge-warning">Expected</span>{% endif %}
+              {% if po.status == 'arrived' %}<span class="badge badge-info">At Dock {{ po.dock_number }}</span>{% endif %}
+              {% if po.status == 'receiving' %}<span class="badge badge-primary">Receiving</span>{% endif %}
+            </td>
+            <td style="padding:12px 16px; text-align:right;">
+              <a href="/inbound/{{ po.id }}/dock/" class="btn btn-primary btn-sm">Process Arrival</a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="4" style="padding:16px" class="muted">No pending deliveries.</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+  </div>
+{% endblock %}

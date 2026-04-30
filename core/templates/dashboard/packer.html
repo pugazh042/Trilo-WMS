@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — Packer Dashboard{% endblock %}
+{% block header_title %}Packer Dashboard{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div class="page-title">Welcome, {{ request.user.first_name|default:request.user.username }}</div>
+    <div class="page-subtitle">Role: <strong>{{ request.user.role|title }}</strong></div>
+  </div>
+
+  <div class="summary-grid" style="display:grid;grid-template-columns:repeat(2,minmax(180px,1fr));gap:14px; max-width: 600px; margin-bottom: 24px;">
+    <div class="card" style="padding:18px">
+      <div style="font-weight:800; color:var(--text-secondary); font-size:13px">Active Pack Tasks</div>
+      <div style="font-family:var(--mono); font-size:30px; font-weight:800">{{ active_tasks|length }}</div>
+    </div>
+    <div class="card" style="padding:18px">
+      <div style="font-weight:800; color:var(--text-secondary); font-size:13px">Completed Packs</div>
+      <div style="font-family:var(--mono); font-size:30px; font-weight:800">{{ completed_count }}</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">Your Active Pack Tasks</div>
+      <a href="/packing/" class="btn btn-outline btn-sm">Go to Packing Module</a>
+    </div>
+    <div class="card-body" style="padding:0">
+      <table style="width:100%; border-collapse:collapse">
+        <tr style="background:var(--bg); border-bottom:1px solid var(--border)">
+          <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Order</th>
+          <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Status</th>
+          <th style="text-align:right; padding:12px 16px; font-size:12px; color:var(--text-muted)">Action</th>
+        </tr>
+        {% for task in active_tasks %}
+          <tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:12px 16px; font-family:var(--mono);">{{ task.order.order_id }}</td>
+            <td style="padding:12px 16px;"><span class="badge badge-warning">{{ task.get_status_display }}</span></td>
+            <td style="padding:12px 16px; text-align:right;">
+              <a href="/packing/{{ task.order.id }}/" class="btn btn-primary btn-sm">Process</a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="3" style="padding:16px" class="muted">You have no active tasks.</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+  </div>
+{% endblock %}
