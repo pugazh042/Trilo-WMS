@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Replenishment Tasks{% endblock %}
+{% block header_title %}Replenishment Tasks{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Created</th>
+                    <th>Status</th>
+                    <th>SKU</th>
+                    <th>Qty</th>
+                    <th>From Bin</th>
+                    <th>To Bin</th>
+                    <th>Assigned To</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for task in tasks %}
+                <tr>
+                    <td>{{ task.created_at|date:"M d, H:i" }}</td>
+                    <td>
+                        {% if task.status == 'pending' %}
+                            <span class="badge bg-warning text-dark">Pending</span>
+                        {% elif task.status == 'in_progress' %}
+                            <span class="badge bg-primary">In Progress</span>
+                        {% else %}
+                            <span class="badge bg-success">Completed</span>
+                        {% endif %}
+                    </td>
+                    <td><strong>{{ task.sku.sku_code }}</strong><br><small class="text-muted">{{ task.sku.name }}</small></td>
+                    <td><span class="badge bg-info rounded-pill">{{ task.quantity }}</span></td>
+                    <td>{{ task.from_bin.bin_code|default:"-" }}</td>
+                    <td>{{ task.to_bin.bin_code|default:"-" }}</td>
+                    <td>{{ task.assigned_to.username|default:"Unassigned" }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="text-center text-muted" style="padding: 40px;">No replenishment tasks.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

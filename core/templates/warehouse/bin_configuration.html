@@ -32,7 +32,12 @@
             <td style="padding:12px 16px; font-weight: 600;">{{ b.bin_code }}</td>
             <td style="padding:12px 16px;">{{ b.level.rack.zone.warehouse.code }}-{{ b.level.rack.zone.code }}-{{ b.level.rack.rack_number }}-L{{ b.level.level_number }}</td>
             <td style="padding:12px 16px; text-align:right;">
-              <input type="number" value="{{ b.max_capacity }}" class="form-control capacity-input" data-id="{{ b.id }}" data-url="/bin/{{ b.id }}/update" style="width: 80px; display: inline-block; padding: 4px;">
+              <select class="form-control config-input" data-field="size" data-id="{{ b.id }}" data-url="/bin/{{ b.id }}/update" style="width: 60px; display: inline-block; padding: 4px;">
+                <option value="S" {% if b.size == 'S' %}selected{% endif %}>S</option>
+                <option value="M" {% if b.size == 'M' %}selected{% endif %}>M</option>
+                <option value="L" {% if b.size == 'L' %}selected{% endif %}>L</option>
+              </select>
+              <input type="number" value="{{ b.max_capacity }}" class="form-control config-input" data-field="max_capacity" data-id="{{ b.id }}" data-url="/bin/{{ b.id }}/update" style="width: 80px; display: inline-block; padding: 4px;">
             </td>
             <td style="padding:12px 16px; text-align:right;">
               <button class="btn btn-outline btn-sm delete-btn" data-id="{{ b.id }}" data-url="/bin/{{ b.id }}/delete">Delete</button>
@@ -67,11 +72,12 @@
     });
   });
 
-  document.querySelectorAll('.capacity-input').forEach(input => {
+  document.querySelectorAll('.config-input').forEach(input => {
     input.addEventListener('change', function() {
       const url = this.getAttribute('data-url');
+      const field = this.getAttribute('data-field');
       const formData = new FormData();
-      formData.append('max_capacity', this.value);
+      formData.append(field, this.value);
       
       fetch(url, {
         method: 'POST',
@@ -81,7 +87,7 @@
       .then(r => r.json())
       .then(data => {
         if(!data.ok) {
-          alert(data.error || 'Failed to update capacity');
+          alert(data.error || 'Failed to update');
           window.location.reload();
         }
       });

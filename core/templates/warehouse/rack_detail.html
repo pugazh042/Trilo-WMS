@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% block title %}Rack {{ rack.rack_number }} View{% endblock %}
+{% block header_title %}Rack {{ rack.rack_number }} Front View{% endblock %}
+
+{% block content %}
+<style>
+.rack-container {
+    background: #e2e8f0;
+    padding: 20px;
+    border-radius: 8px;
+    border: 4px solid #64748b;
+    display: flex;
+    flex-direction: column-reverse; /* Bottom level at the bottom */
+    gap: 12px;
+}
+.rack-level {
+    background: #cbd5e1;
+    border-radius: 4px;
+    padding: 10px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+.level-label {
+    font-weight: bold;
+    color: #334155;
+    width: 40px;
+    text-align: center;
+}
+.bin-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    flex: 1;
+}
+.bin-box {
+    background: #ffffff;
+    border: 2px solid #94a3b8;
+    border-radius: 6px;
+    padding: 10px;
+    flex: 1;
+    min-width: 120px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+}
+.bin-box:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+.bin-header {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 4px;
+}
+.bin-body {
+    font-size: 0.8rem;
+    color: #475569;
+}
+.bin-full { border-color: #ef4444; background: #fef2f2; }
+.bin-partial { border-color: #f59e0b; background: #fffbeb; }
+.bin-empty { border-color: #22c55e; background: #f0fdf4; }
+
+.bin-capacity-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 4px;
+    background: #e2e8f0;
+    width: 100%;
+}
+.bin-capacity-fill {
+    height: 100%;
+    background: #3b82f6;
+}
+.bin-full .bin-capacity-fill { background: #ef4444; }
+.bin-partial .bin-capacity-fill { background: #f59e0b; }
+.bin-empty .bin-capacity-fill { background: #22c55e; width: 0 !important; }
+</style>
+
+<div class="mb-3">
+    <a href="/warehouse/layout/" class="btn btn-outline-secondary btn-sm">&larr; Back to Map</a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <h5 class="card-title">Location: {{ rack.aisle.zone.code }} &rarr; Aisle {{ rack.aisle.aisle_number }} &rarr; Rack {{ rack.rack_number }}</h5>
+        <div class="text-muted small mb-4">Total Levels: {{ rack.total_levels }}</div>
+        
+        <div class="rack-container">
+            {% for level in levels %}
+            <div class="rack-level">
+                <div class="level-label">L{{ level.level_number }}</div>
+                <div class="bin-grid">
+                    {% for bin in level.bins_data %}
+                        {% if bin.current_capacity >= bin.max_capacity and bin.max_capacity > 0 %}
+                            {% set bin_class = 'bin-full' %}
+                            {% set pct = 100 %}
+                        {% elif bin.current_capacity > 0 %}
+                            {% set bin_class = 'bin-partial' %}
+                            {% set pct = bin.usage_pct %}
+                        {% else %}
+                            {% set bin_class = 'bin-empty' %}
+                            {% set pct = 0 %}
+                        {% endif %}
+                        
+                        <div class="bin-box {{ bin_class }}" onclick="showBinDetails('{{ bin.id }}')">
+                            <div class="bin-header">{{ bin.bin_code }}</div>
+                            <div class="bin-body">
+                                <div>Cap: {{ bin.current_capacity }}/{{ bin.max_capacity|default:"&infin;" }}</div>
+                                <div>Items: {{ bin.inventory|length }}</div>
+                            </div>
+                            <div class="bin-capacity-bar">
+                                <div class="bin-capacity-fill" style="width: {{ pct }}%"></div>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <div class="text-muted small">No bins configured for this level.</div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Bin Details -->
+<div class="modal fade" id="binModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="binModalTitle">Bin Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="binModalBody">
+        Loading...
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Use the data embedded in the context to show modal (we passed it directly to avoid extra fetches if possible)
+const binData = {
+    {% for level in levels %}
+        {% for bin in level.bins_data %}
+            "{{ bin.id }}": {{ bin|safe }},
+        {% endfor %}
+    {% endfor %}
+};
+
+function showBinDetails(binId) {
+    const bin = binData[binId];
+    if (!bin) return;
+    
+    document.getElementById('binModalTitle').textContent = `Bin: ${bin.bin_code}`;
+    
+    let html = `
+        <table class="table table-sm">
+            <tr><th>Size</th><td>${bin.size}</td></tr>
+            <tr><th>Type</th><td>${bin.bin_type}</td></tr>
+            <tr><th>Usage</th><td>${bin.current_capacity} / ${bin.max_capacity || 'Unlimited'}</td></tr>
+        </table>
+        <h6>Inventory</h6>
+        <ul class="list-group list-group-flush mb-3">
+    `;
+    
+    if (bin.inventory && bin.inventory.length > 0) {
+        bin.inventory.forEach(inv => {
+            html += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                ${inv.sku}
+                <span class="badge bg-primary rounded-pill">${inv.qty}</span>
+            </li>`;
+        });
+    } else {
+        html += `<li class="list-group-item text-muted">Empty</li>`;
+    }
+    
+    html += `</ul>`;
+    
+    // Add transfer button placeholder
+    if (bin.inventory && bin.inventory.length > 0) {
+        html += `<button class="btn btn-warning btn-sm w-100" onclick="alert('Internal transfer functionality pending.')">Transfer Stock</button>`;
+    }
+    
+    document.getElementById('binModalBody').innerHTML = html;
+    new bootstrap.Modal(document.getElementById('binModal')).show();
+}
+</script>
+{% endblock %}

@@ -40,28 +40,25 @@
               <td style="padding:12px 16px; text-align:right">
                 {% if can_confirm_putaway %}
                   {% if bins %}
-                    <form method="post" action="/inbound/putaway/tasks/{{ t.id }}/complete/">
-                      {% csrf_token %}
-                      {% if t.suggested_bin %}
-                        <div style="margin-bottom:8px; font-weight:600;">Put in: {{ t.suggested_bin.bin_code }}</div>
-                        <button class="btn btn-primary btn-sm" type="submit">Confirm</button>
-                      {% else %}
-                        <span class="muted">No suggested bin available</span>
-                      {% endif %}
-                    </form>
+                    {% if t.suggested_bin %}
+                      <div style="margin-bottom:8px; font-weight:600;">Put in: {{ t.suggested_bin.bin_code }}</div>
+                      <a class="btn btn-primary btn-sm" href="/inbound/putaway/tasks/{{ t.id }}/complete/">Start Put-away</a>
+                    {% else %}
+                      <span class="muted">No suggested bin available</span>
+                    {% endif %}
                   {% else %}
                     <span class="muted">No bins configured yet</span>
                   {% endif %}
                 {% else %}
                   {% if bins %}
-                    <form method="post" action="/inbound/putaway/tasks/{{ t.id }}/suggested-bin/" style="display:flex; gap:8px; justify-content:flex-end; align-items:center">
+                    <form method="post" action="/inbound/putaway/tasks/{{ t.id }}/suggested-bin/" id="form-{{ t.id }}" style="display:flex; justify-content:flex-end;">
                       {% csrf_token %}
-                      <select class="form-control" name="suggested_bin_id" style="min-width:220px">
+                      <select class="form-control" name="suggested_bin_id" style="min-width:220px; border: none; background: transparent; cursor: pointer; text-align: right; outline: none; font-weight: 600;" onchange="document.getElementById('form-{{ t.id }}').submit();">
+                        <option value="">Select Bin...</option>
                         {% for b in bins %}
                           <option value="{{ b.id }}" {% if t.suggested_bin_id == b.id %}selected{% endif %}>{{ b.bin_code }}</option>
                         {% endfor %}
                       </select>
-                      <button class="btn btn-outline btn-sm" type="submit">Update suggestion</button>
                     </form>
                   {% else %}
                     <span class="muted">No bins configured yet</span>

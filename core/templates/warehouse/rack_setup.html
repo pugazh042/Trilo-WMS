@@ -23,12 +23,18 @@
         <tr style="background:var(--bg); border-bottom:1px solid var(--border)">
           <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Rack</th>
           <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Zone</th>
+          <th style="text-align:center; padding:12px 16px; font-size:12px; color:var(--text-muted)">Levels</th>
           <th style="text-align:right; padding:12px 16px; font-size:12px; color:var(--text-muted)">Action</th>
         </tr>
         {% for r in racks %}
           <tr style="border-bottom:1px solid var(--border)">
-            <td style="padding:12px 16px; font-weight: 600;">{{ r.rack_number }}</td>
+            <td style="padding:12px 16px; font-weight: 600;">
+              <input type="text" value="{{ r.rack_number }}" class="form-control config-input" data-field="rack_number" data-url="/rack/{{ r.id }}/update" style="width: 80px; display: inline-block; padding: 4px;">
+            </td>
             <td style="padding:12px 16px;">{{ r.zone.warehouse.code }}-{{ r.zone.code }}</td>
+            <td style="padding:12px 16px; text-align:center;">
+              <input type="number" value="{{ r.total_levels }}" class="form-control config-input" data-field="total_levels" data-url="/rack/{{ r.id }}/update" style="width: 60px; display: inline-block; padding: 4px;">
+            </td>
             <td style="padding:12px 16px; text-align:right;">
               <button class="btn btn-outline btn-sm delete-btn" data-id="{{ r.id }}" data-url="/rack/{{ r.id }}/delete">Delete</button>
             </td>
@@ -59,6 +65,28 @@
           }
         });
       }
+    });
+  });
+
+  document.querySelectorAll('.config-input').forEach(input => {
+    input.addEventListener('change', function() {
+      const url = this.getAttribute('data-url');
+      const field = this.getAttribute('data-field');
+      const formData = new FormData();
+      formData.append(field, this.value);
+      
+      fetch(url, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+        body: formData
+      })
+      .then(r => r.json())
+      .then(data => {
+        if(!data.ok) {
+          alert(data.error || 'Failed to update');
+          window.location.reload();
+        }
+      });
     });
   });
 </script>

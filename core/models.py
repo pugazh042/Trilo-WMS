@@ -34,9 +34,15 @@ class SKU(models.Model):
         BOX = "box", "Box"
         PALLET = "pallet", "Pallet"
 
+    class ABCClass(models.TextChoices):
+        A = "A", "A (Fast)"
+        B = "B", "B (Medium)"
+        C = "C", "C (Slow)"
+
     name = models.CharField(max_length=200)
     sku_code = models.CharField(max_length=80, unique=True)
     category = models.CharField(max_length=120, blank=True, default="")
+    abc_class = models.CharField(max_length=1, choices=ABCClass.choices, default=ABCClass.C)
     brand = models.CharField(max_length=120, blank=True, default="")
     unit_type = models.CharField(max_length=20, choices=UnitType.choices, default=UnitType.UNIT)
     weight = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -123,6 +129,7 @@ class Task(models.Model):
 class Location(models.Model):
     code = models.CharField(max_length=40, unique=True)
     zone = models.CharField(max_length=40, blank=True, default="")
+    aisle = models.CharField(max_length=40, blank=True, default="")
     rack = models.CharField(max_length=40, blank=True, default="")
     bin = models.CharField(max_length=40, blank=True, default="")
 
@@ -437,6 +444,7 @@ class Zone(models.Model):
     temperature = models.CharField(
         max_length=20, choices=Temperature.choices, default=Temperature.NORMAL
     )
+    is_hazardous = models.BooleanField(default=False)
 
     class Meta:
         unique_together = ("warehouse", "code")
@@ -445,18 +453,29 @@ class Zone(models.Model):
         return f"{self.warehouse.code}-{self.code}"
 
 
+class Aisle(models.Model):
+    zone = models.ForeignKey(Zone, on_delete=models.CASCADE, related_name="aisles")
+    aisle_number = models.CharField(max_length=20)
+
+    class Meta:
+        unique_together = ("zone", "aisle_number")
+
+    def __str__(self) -> str:
+        return f"{self.zone.warehouse.code}-{self.zone.code}-A{self.aisle_number}"
+
+
 class Rack(models.Model):
-    zone = models.ForeignKey(Zone, on_delete=models.CASCADE, related_name="racks")
+    aisle = models.ForeignKey(Aisle, on_delete=models.CASCADE, related_name="racks")
     rack_number = models.CharField(max_length=20)
     levels = models.PositiveIntegerField(default=1)
     total_levels = models.PositiveIntegerField(default=1)
     max_capacity = models.PositiveIntegerField(default=0)
 
     class Meta:
-        unique_together = ("zone", "rack_number")
+        unique_together = ("aisle", "rack_number")
 
     def __str__(self) -> str:
-        return f"{self.zone}-{self.rack_number}"
+        return f"{self.aisle.zone.warehouse.code}-{self.aisle.zone.code}-A{self.aisle.aisle_number}-R{self.rack_number}"
 
 
 class Bin(models.Model):
@@ -465,13 +484,23 @@ class Bin(models.Model):
         MEDIUM = "M", "Medium"
         LARGE = "L", "Large"
 
+    class BinType(models.TextChoices):
+        PALLET = "pallet", "Pallet"
+        SHELF = "shelf", "Shelf"
+        CARTON = "carton", "Carton"
+        LOOSE = "loose", "Loose"
+
     rack = models.ForeignKey(Rack, on_delete=models.CASCADE, related_name="bins")
     level = models.ForeignKey("Level", on_delete=models.CASCADE, null=True, blank=True, related_name="bins")
     level_number = models.PositiveIntegerField(default=1)
     bin_code = models.CharField(max_length=80, unique=True)
     size = models.CharField(max_length=1, choices=Size.choices, default=Size.MEDIUM)
+    bin_type = models.CharField(max_length=20, choices=BinType.choices, default=BinType.SHELF)
+    allow_mixed_skus = models.BooleanField(default=False)
     max_capacity = models.PositiveIntegerField(default=0)
     current_capacity = models.PositiveIntegerField(default=0)
+    max_weight = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    max_volume = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def __str__(self) -> str:
         return self.bin_code
@@ -488,9 +517,11 @@ class Inventory(models.Model):
     bin = models.ForeignKey(Bin, on_delete=models.PROTECT, null=True, blank=True, related_name="inventory_records")
     quantity = models.IntegerField(default=0)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.AVAILABLE)
+    batch_number = models.CharField(max_length=80, blank=True, default="")
+    expiry_date = models.DateField(null=True, blank=True)
 
     class Meta:
-        unique_together = ("sku", "warehouse", "bin")
+        unique_together = ("sku", "warehouse", "bin", "batch_number")
 
     def __str__(self) -> str:
         return f"{self.sku.sku_code} @ {self.warehouse.code}"
@@ -505,7 +536,7 @@ class Level(models.Model):
         ordering = ["level_number"]
 
     def __str__(self) -> str:
-        return f"{self.rack.zone.warehouse.code}-{self.rack.zone.code}-{self.rack.rack_number}-L{self.level_number}"
+        return f"{self.rack.aisle.zone.warehouse.code}-{self.rack.aisle.zone.code}-A{self.rack.aisle.aisle_number}-R{self.rack.rack_number}-L{self.level_number}"
 
 
 class StockAdjustment(models.Model):
@@ -520,3 +551,35 @@ class StockAdjustment(models.Model):
     reason = models.TextField(blank=True, default="")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="stock_adjustments")
     timestamp = models.DateTimeField(auto_now_add=True)
+
+class StockLedger(models.Model):
+    class MovementType(models.TextChoices):
+        PUTAWAY = "putaway", "Putaway"
+        PICK = "pick", "Pick"
+        TRANSFER = "transfer", "Transfer"
+        ADJUSTMENT = "adjustment", "Adjustment"
+        RECEIPT = "receipt", "Receipt"
+
+    sku = models.ForeignKey(SKU, on_delete=models.PROTECT, related_name="ledger_entries")
+    movement_type = models.CharField(max_length=30, choices=MovementType.choices)
+    quantity = models.IntegerField()  # positive for IN, negative for OUT
+    from_bin = models.ForeignKey(Bin, on_delete=models.SET_NULL, null=True, blank=True, related_name="ledger_out_entries")
+    to_bin = models.ForeignKey(Bin, on_delete=models.SET_NULL, null=True, blank=True, related_name="ledger_in_entries")
+    reference_id = models.CharField(max_length=80, blank=True, default="", help_text="e.g. Task ID, Order ID")
+    performed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+class ReplenishmentTask(models.Model):
+    class Status(models.TextChoices):
+        OPEN = "open", "Open"
+        IN_PROGRESS = "in_progress", "In Progress"
+        DONE = "done", "Done"
+
+    sku = models.ForeignKey(SKU, on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField()
+    source_bin = models.ForeignKey(Bin, on_delete=models.CASCADE, related_name="replenishment_sources")
+    destination_bin = models.ForeignKey(Bin, on_delete=models.CASCADE, related_name="replenishment_destinations")
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.OPEN)
+    assigned_to = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+

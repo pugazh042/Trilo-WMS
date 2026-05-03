@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Internal Transfers{% endblock %}
+{% block header_title %}Internal Stock Transfer{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-5">
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">New Transfer</div>
+            <div class="card-body">
+                <form id="transferForm">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">SKU Code</label>
+                        <select class="form-select" id="skuSelect" required>
+                            <option value="">Select SKU...</option>
+                            {% for sku in skus %}
+                            <option value="{{ sku.id }}">{{ sku.sku_code }} - {{ sku.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">From Bin</label>
+                        <select class="form-select" id="fromBinSelect" required>
+                            <option value="">Select Source Bin...</option>
+                            {% for bin in bins %}
+                            <option value="{{ bin.id }}">{{ bin.bin_code }} (Cap: {{ bin.current_capacity }}/{{ bin.max_capacity|default:'∞' }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">To Bin</label>
+                        <select class="form-select" id="toBinSelect" required>
+                            <option value="">Select Destination Bin...</option>
+                            {% for bin in bins %}
+                            <option value="{{ bin.id }}">{{ bin.bin_code }} (Cap: {{ bin.current_capacity }}/{{ bin.max_capacity|default:'∞' }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Quantity</label>
+                        <input type="number" class="form-control" id="qtyInput" min="1" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Execute Transfer</button>
+                </form>
+                <div id="transferMsg" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-7">
+        <div class="card">
+            <div class="card-header bg-light">Recent Transfers (Ledger)</div>
+            <div class="card-body p-0">
+                <table class="table table-sm table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Time</th>
+                            <th>SKU</th>
+                            <th>Qty</th>
+                            <th>From</th>
+                            <th>To</th>
+                            <th>User</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in ledger_entries %}
+                        <tr>
+                            <td>{{ entry.timestamp|date:"M d, H:i" }}</td>
+                            <td>{{ entry.sku.sku_code }}</td>
+                            <td>{{ entry.quantity }}</td>
+                            <td>{{ entry.from_bin.bin_code|default:"-" }}</td>
+                            <td>{{ entry.to_bin.bin_code|default:"-" }}</td>
+                            <td>{{ entry.performed_by.username|default:"System" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="6" class="text-center text-muted">No recent transfers.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('transferForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const btn = this.querySelector('button[type="submit"]');
+    const msg = document.getElementById('transferMsg');
+    
+    const sku_id = document.getElementById('skuSelect').value;
+    const from_bin = document.getElementById('fromBinSelect').value;
+    const to_bin = document.getElementById('toBinSelect').value;
+    const qty = document.getElementById('qtyInput').value;
+    
+    if(from_bin === to_bin) {
+        msg.innerHTML = '<div class="alert alert-danger">Source and destination bins cannot be the same.</div>';
+        return;
+    }
+    
+    btn.disabled = true;
+    msg.innerHTML = '';
+    
+    const fd = new FormData();
+    fd.append('sku_id', sku_id);
+    fd.append('from_bin_id', from_bin);
+    fd.append('to_bin_id', to_bin);
+    fd.append('quantity', qty);
+    fd.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    
+    fetch('/api/inventory/transfer', {
+        method: 'POST',
+        body: fd
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(data.ok) {
+            window.location.reload();
+        } else {
+            msg.innerHTML = `<div class="alert alert-danger">${data.error || 'Transfer failed'}</div>`;
+            btn.disabled = false;
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        msg.innerHTML = `<div class="alert alert-danger">Network error</div>`;
+        btn.disabled = false;
+    });
+});
+</script>
+{% endblock %}

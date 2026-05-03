@@ -2,8 +2,190 @@
 {% block title %}Warehouse Layout Map{% endblock %}
 {% block header_title %}Warehouse Layout Map{% endblock %}
 {% block content %}
-<div class="card"><div class="card-body">
-  <div class="page-subtitle">Visual placeholder for warehouse layout map.</div>
-  {% for w in warehouses %}<div style="margin-top:8px;padding:10px;background:#faf5ff;border-radius:8px">{{ w.code }} - {{ w.name }}</div>{% endfor %}
-</div></div>
+<style>
+.warehouse-map {
+    display: grid;
+    gap: 20px;
+    padding: 20px;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+.zone-block {
+    background: #ffffff;
+    border: 2px dashed #cbd5e1;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+}
+.zone-header {
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin-bottom: 12px;
+    color: #334155;
+    display: flex;
+    justify-content: space-between;
+}
+.aisle-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+.aisle-block {
+    background: #f1f5f9;
+    border: 1px solid #94a3b8;
+    border-radius: 6px;
+    padding: 10px;
+    flex: 1;
+    min-width: 250px;
+}
+.aisle-header {
+    font-weight: 600;
+    margin-bottom: 8px;
+    text-align: center;
+    color: #475569;
+}
+.rack-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+    gap: 8px;
+}
+.rack-block {
+    background: #e2e8f0;
+    border: 1px solid #64748b;
+    border-radius: 4px;
+    text-align: center;
+    padding: 8px 4px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.rack-block:hover {
+    background: #cbd5e1;
+    transform: scale(1.05);
+}
+.rack-block.rack-full { background: #fee2e2; border-color: #ef4444; color: #7f1d1d; }
+.rack-block.rack-partial { background: #fef3c7; border-color: #f59e0b; color: #78350f; }
+.rack-block.rack-empty { background: #dcfce7; border-color: #22c55e; color: #14532d; }
+</style>
+
+<div class="card">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="card-title mb-0">Visual Layout</h5>
+            <select id="warehouseSelect" class="form-select form-select-sm" style="width: 200px;">
+                <option value="">Select Warehouse...</option>
+                {% for w in warehouses %}
+                    <option value="{{ w.id }}">{{ w.code }} - {{ w.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div id="mapContainer" class="warehouse-map">
+            <div class="text-center text-muted" style="padding: 40px;">
+                Please select a warehouse to view its layout.
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('warehouseSelect').addEventListener('change', function() {
+    const wid = this.value;
+    if (!wid) {
+        document.getElementById('mapContainer').innerHTML = '<div class="text-center text-muted" style="padding: 40px;">Please select a warehouse to view its layout.</div>';
+        return;
+    }
+    
+    document.getElementById('mapContainer').innerHTML = '<div class="text-center" style="padding: 40px;">Loading map...</div>';
+    
+    fetch(`/warehouse/${wid}/hierarchy`)
+        .then(res => res.json())
+        .then(data => {
+            renderMap(data);
+        })
+        .catch(err => {
+            console.error(err);
+            document.getElementById('mapContainer').innerHTML = '<div class="text-danger">Failed to load warehouse layout.</div>';
+        });
+});
+
+function renderMap(data) {
+    const container = document.getElementById('mapContainer');
+    container.innerHTML = '';
+    
+    if (!data.zones || data.zones.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted" style="padding: 40px;">No zones configured for this warehouse.</div>';
+        return;
+    }
+    
+    data.zones.forEach(zone => {
+        const zDiv = document.createElement('div');
+        zDiv.className = 'zone-block';
+        
+        let hazardBadge = zone.is_hazardous ? '<span class="badge bg-danger">Hazardous</span>' : '';
+        let tempBadge = zone.temperature === 'cold' ? '<span class="badge bg-info">Cold Storage</span>' : '';
+        
+        zDiv.innerHTML = `
+            <div class="zone-header">
+                <span>Zone: ${zone.code} - ${zone.name}</span>
+                <div>${hazardBadge} ${tempBadge}</div>
+            </div>
+            <div class="aisle-container" id="aisles-${zone.id}"></div>
+        `;
+        container.appendChild(zDiv);
+        
+        const aislesContainer = zDiv.querySelector(`#aisles-${zone.id}`);
+        
+        if (!zone.aisles || zone.aisles.length === 0) {
+            aislesContainer.innerHTML = '<span class="text-muted small">No aisles configured.</span>';
+            return;
+        }
+        
+        zone.aisles.forEach(aisle => {
+            const aDiv = document.createElement('div');
+            aDiv.className = 'aisle-block';
+            aDiv.innerHTML = `
+                <div class="aisle-header">Aisle ${aisle.aisle_number}</div>
+                <div class="rack-grid" id="racks-${aisle.id}"></div>
+            `;
+            aislesContainer.appendChild(aDiv);
+            
+            const racksContainer = aDiv.querySelector(`#racks-${aisle.id}`);
+            if (!aisle.racks || aisle.racks.length === 0) {
+                racksContainer.innerHTML = '<span class="text-muted small">No racks.</span>';
+                return;
+            }
+            
+            aisle.racks.forEach(rack => {
+                // Calculate rack occupancy based on bins
+                let totalBins = 0;
+                let emptyBins = 0;
+                let fullBins = 0;
+                
+                rack.levels.forEach(lvl => {
+                    lvl.bins.forEach(bin => {
+                        totalBins++;
+                        if (bin.current_capacity === 0) emptyBins++;
+                        else if (bin.max_capacity > 0 && bin.current_capacity >= bin.max_capacity) fullBins++;
+                    });
+                });
+                
+                let rackClass = 'rack-empty';
+                if (totalBins > 0) {
+                    if (fullBins === totalBins) rackClass = 'rack-full';
+                    else if (emptyBins < totalBins) rackClass = 'rack-partial';
+                }
+                
+                const rBtn = document.createElement('div');
+                rBtn.className = `rack-block ${rackClass}`;
+                rBtn.textContent = `R${rack.rack_number}`;
+                rBtn.title = `Click to view Rack ${rack.rack_number} details`;
+                rBtn.onclick = () => window.location.href = `/warehouse/rack/${rack.id}/view/`;
+                racksContainer.appendChild(rBtn);
+            });
+        });
+    });
+}
+</script>
 {% endblock %}

@@ -996,6 +996,22 @@ def create_warehouse(request):
         return redirect("/warehouse/")
     return render(request, "warehouse/create_warehouse.html", {"today_str": now_date_str()})
 
+@login_required
+@role_required("admin", "manager")
+@require_http_methods(["GET", "POST"])
+def edit_warehouse(request, warehouse_id: int):
+    warehouse = get_object_or_404(Warehouse, pk=warehouse_id)
+    if request.method == "POST":
+        warehouse.name = (request.POST.get("name") or "").strip()
+        warehouse.code = (request.POST.get("code") or "").strip().upper()
+        warehouse.location = (request.POST.get("location") or "").strip()
+        warehouse.contact = (request.POST.get("contact") or "").strip()
+        warehouse.status = (request.POST.get("status") or Warehouse.Status.ACTIVE)
+        warehouse.save()
+        messages.success(request, "Warehouse updated successfully.")
+        return redirect(f"/warehouse/{warehouse.id}/")
+    return render(request, "warehouse/edit_warehouse.html", {"warehouse": warehouse, "today_str": now_date_str()})
+
 
 @login_required
 @role_required("admin", "manager")
@@ -1225,7 +1241,7 @@ def stock_adjustment(request):
         {
             "rows": Inventory.objects.select_related("sku", "warehouse", "bin"),
             "skus": SKU.objects.order_by("sku_code"),
-            "bins": Bin.objects.select_related("level__rack__zone__warehouse").order_by("bin_code"),
+            "bins": Bin.objects.select_related("level__rack__aisle__zone__warehouse").order_by("bin_code"),
             "today_str": now_date_str(),
         },
     )
@@ -1242,3 +1258,63 @@ def barcode_generator(request):
 @role_required("admin", "manager")
 def packaging_hierarchy(request):
     return render(request, "inventory/packaging_hierarchy.html", {"rows": SKU.objects.order_by("sku_code"), "today_str": now_date_str()})
+
+@login_required
+@role_required("admin", "manager", "putaway", "picker")
+def rack_detail_view(request, rack_id: int):
+    rack = get_object_or_404(Rack.objects.select_related("aisle__zone__warehouse"), pk=rack_id)
+    levels = rack.level_rows.all().order_by("-level_number")
+    levels_data = []
+    
+    for lvl in levels:
+        bins = lvl.bins.all().order_by("bin_code")
+        bins_data = []
+        for b in bins:
+            inv_rows = Inventory.objects.filter(bin=b, quantity__gt=0).select_related("sku")
+            bins_data.append({
+                "id": b.id,
+                "bin_code": b.bin_code,
+                "size": b.size,
+                "bin_type": b.bin_type,
+                "max_capacity": b.max_capacity,
+                "current_capacity": b.current_capacity,
+                "usage_pct": int((b.current_capacity / b.max_capacity) * 100) if b.max_capacity > 0 else 0,
+                "inventory": [{"sku": i.sku.sku_code, "qty": i.quantity} for i in inv_rows],
+            })
+        levels_data.append({
+            "level_number": lvl.level_number,
+            "bins_data": bins_data,
+        })
+        
+    return render(request, "warehouse/rack_detail.html", {
+        "rack": rack,
+        "levels": levels_data,
+        "today_str": now_date_str()
+    })
+
+@login_required
+@role_required("admin", "manager")
+def stock_transfer(request):
+    from .models import StockLedger
+    return render(request, "inventory/stock_transfer.html", {
+        "skus": SKU.objects.order_by("sku_code"),
+        "bins": Bin.objects.select_related("level__rack__aisle__zone__warehouse").order_by("bin_code"),
+        "ledger_entries": StockLedger.objects.filter(movement_type=StockLedger.MovementType.TRANSFER).select_related("sku", "from_bin", "to_bin", "performed_by").order_by("-timestamp")[:50],
+        "today_str": now_date_str()
+    })
+
+@login_required
+@role_required("admin", "manager", "putaway", "picker")
+def replenishment_tasks(request):
+    from .models import ReplenishmentTask
+    role = getattr(request.user, "role", "").lower()
+    
+    qs = ReplenishmentTask.objects.select_related("sku", "from_bin", "to_bin", "assigned_to").order_by("-created_at")
+    if role in ("putaway", "picker"):
+        qs = qs.filter(Q(assigned_to=request.user) | Q(assigned_to__isnull=True))
+        
+    return render(request, "inventory/replenishment_tasks.html", {
+        "tasks": qs,
+        "today_str": now_date_str()
+    })
+

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Trilo WMS — Put-away Task{{ task.id }}{% endblock %}
+{% block header_title %}Put-away IPW{{ task.id }}{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div class="page-title">Execute put-away</div>
+    <div class="page-subtitle">PO {{ task.purchase_order.po_number }} · {{ task.sku.sku_code }} · qty {{ task.quantity }}</div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <p><strong>SKU:</strong> <span style="font-family:var(--mono)">{{ task.sku.sku_code }}</span></p>
+      <p><strong>Quantity to put away:</strong> {{ task.quantity }}</p>
+      <p><strong>Final Location:</strong> 
+        {% if task.suggested_bin %}
+          <span style="font-family:var(--mono); font-size: 1.2em; font-weight: 700;">{{ task.suggested_bin.bin_code }}</span>
+        {% else %}
+          <span class="muted">No bin suggested. Contact manager.</span>
+        {% endif %}
+      </p>
+
+      <hr class="divider"/>
+
+      {% if task.suggested_bin %}
+        <form method="post">
+          {% csrf_token %}
+          <div class="form-group">
+            <label class="form-label" for="sku_code">Scan SKU</label>
+            <input class="form-control" id="sku_code" name="sku_code" placeholder="SKU code" required autofocus />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="bin_code">Scan Final Location</label>
+            <input class="form-control" id="bin_code" name="bin_code" placeholder="Bin code" required />
+          </div>
+          <div style="display:flex; gap:10px; justify-content:flex-end">
+            <a class="btn btn-ghost" href="/inbound/putaway/tasks/">Back</a>
+            <button class="btn btn-primary" type="submit">Verify & Confirm Put-away</button>
+          </div>
+        </form>
+      {% else %}
+        <div style="display:flex; justify-content:flex-end">
+          <a class="btn btn-ghost" href="/inbound/putaway/tasks/">Back</a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

@@ -27,21 +27,46 @@ from .models import (
 from .utils import now_date_str
 
 
-def _suggested_location_for_sku(sku_id: int) -> Location | None:
+def _suggested_location_for_sku(sku_id: int, suggested_bin: Bin | None = None) -> Location | None:
+    if suggested_bin:
+        loc, _ = Location.objects.get_or_create(
+            code=suggested_bin.bin_code,
+            defaults={
+                "zone": suggested_bin.level.rack.aisle.zone.code,
+                "aisle": suggested_bin.level.rack.aisle.aisle_number,
+                "rack": suggested_bin.level.rack.rack_number,
+                "bin": suggested_bin.bin_code,
+            },
+        )
+        return loc
     return Location.objects.order_by("code").first()
 
 
-def _suggested_bin_for_sku(quantity: int = 0, sku_category: str = "") -> Bin | None:
-    qs = Bin.objects.select_related("level__rack__zone__warehouse").order_by("current_capacity", "bin_code")
+def _suggested_bin_for_sku(sku: SKU, quantity: int = 0) -> Bin | None:
+    qs = Bin.objects.select_related("level__rack__aisle__zone__warehouse").order_by("current_capacity", "bin_code")
     
-    # Try finding a bin in a zone that matches the SKU category
+    sku_category = sku.category
+    
+    # 1. Exact match on Zone Category
     if sku_category:
-        category_bins = qs.filter(level__rack__zone__category__iexact=sku_category)
+        category_bins = qs.filter(level__rack__aisle__zone__category__iexact=sku_category)
         for b in category_bins:
             if b.max_capacity == 0 or (b.max_capacity - b.current_capacity) >= quantity:
                 return b
 
-    # Fallback to any available bin
+        # 2. Partial match on Zone Category
+        partial_bins = qs.filter(level__rack__aisle__zone__category__icontains=sku_category)
+        for b in partial_bins:
+            if b.max_capacity == 0 or (b.max_capacity - b.current_capacity) >= quantity:
+                return b
+
+    # 3. Fallback to zones with NO specific category (general zones)
+    general_bins = qs.filter(level__rack__aisle__zone__category="")
+    for b in general_bins:
+        if b.max_capacity == 0 or (b.max_capacity - b.current_capacity) >= quantity:
+            return b
+
+    # 4. Fallback to any available bin
     for b in qs:
         # max_capacity=0 is treated as no configured cap.
         if b.max_capacity == 0 or (b.max_capacity - b.current_capacity) >= quantity:
@@ -339,8 +364,8 @@ def create_putaway_tasks(request, po_id: int):
             purchase_order=po,
             status=StagingItem.Status.READY_FOR_PUTAWAY,
         ):
-            loc = _suggested_location_for_sku(st.sku_id)
-            suggested_bin = _suggested_bin_for_sku(st.quantity, st.sku.category)
+            suggested_bin = _suggested_bin_for_sku(st.sku, st.quantity)
+            loc = _suggested_location_for_sku(st.sku_id, suggested_bin)
             assign = workers[idx % len(workers)] if workers else None
             idx += 1
             InboundPutawayTask.objects.create(
@@ -376,7 +401,7 @@ def inbound_putaway_list(request):
         "suggested_bin",
         "purchase_order",
     )
-    bins = Bin.objects.select_related("level__rack__zone__warehouse").order_by("bin_code")
+    bins = Bin.objects.select_related("level__rack__aisle__zone__warehouse").order_by("bin_code")
     return render(
         request,
         "inbound/inbound_putaway_list.html",
@@ -414,30 +439,46 @@ def inbound_putaway_set_suggested_bin(request, task_id: int):
 
 @login_required
 @role_required("putaway")
-@require_http_methods(["POST"])
+@require_http_methods(["GET", "POST"])
 def inbound_putaway_complete(request, task_id: int):
     task = get_object_or_404(InboundPutawayTask, pk=task_id, assigned_to=request.user)
+    
+    if request.method == "GET":
+        if task.status == InboundPutawayTask.Status.OPEN:
+            task.status = InboundPutawayTask.Status.IN_PROGRESS
+            task.save(update_fields=["status"])
+        return render(request, "inbound/inbound_putaway_detail.html", {"task": task, "today_str": now_date_str()})
+
     from .models import StockBin
 
+    bin_code = (request.POST.get("bin_code") or "").strip()
+    sku_code = (request.POST.get("sku_code") or "").strip()
+
+    if not task.suggested_bin:
+        messages.error(request, "No suggested bin available.")
+        return redirect(f"/inbound/putaway/tasks/{task.id}/complete/")
+
+    if bin_code.upper() != task.suggested_bin.bin_code.upper():
+        messages.error(request, f"Wrong bin. Expected {task.suggested_bin.bin_code}.")
+        return redirect(f"/inbound/putaway/tasks/{task.id}/complete/")
+
+    if sku_code.upper() != task.sku.sku_code.upper():
+        messages.error(request, f"Wrong SKU. Expected {task.sku.sku_code}.")
+        return redirect(f"/inbound/putaway/tasks/{task.id}/complete/")
+
     with transaction.atomic():
-        bin_id = request.POST.get("bin_id")
-        target_bin = get_object_or_404(Bin.objects.select_related("level__rack__zone__warehouse"), pk=bin_id) if bin_id else task.suggested_bin
-        if not target_bin:
-            messages.error(request, "Bin is required for put-away.")
-            return redirect("/inbound/putaway/tasks/")
-            
+        target_bin = task.suggested_bin
         if target_bin.max_capacity > 0 and (target_bin.current_capacity + task.quantity) > target_bin.max_capacity:
             messages.error(request, f"Cannot put-away {task.quantity} items into {target_bin.bin_code}. Capacity exceeded.")
-            return redirect("/inbound/putaway/tasks/")
+            return redirect(f"/inbound/putaway/tasks/{task.id}/complete/")
             
         loc = task.suggested_location
         if not loc:
-            # Fallback for setups where Location rows are not pre-seeded.
-            # Keep StockBin in sync with physical bin master by creating/using a location per bin code.
             loc, _ = Location.objects.get_or_create(
                 code=target_bin.bin_code,
                 defaults={
-                    "zone": target_bin.level.rack.zone.code,
+                    "zone": target_bin.level.rack.aisle.zone.code,
+                    "aisle": target_bin.level.rack.aisle.aisle_number,
                     "rack": target_bin.level.rack.rack_number,
                     "bin": target_bin.bin_code,
                 },
@@ -456,8 +497,8 @@ def inbound_putaway_complete(request, task_id: int):
             sku=task.sku,
             bin=target_bin,
             defaults={
-                "warehouse": target_bin.level.rack.zone.warehouse,
-                "zone": target_bin.level.rack.zone,
+                "warehouse": target_bin.level.rack.aisle.zone.warehouse,
+                "zone": target_bin.level.rack.aisle.zone,
                 "quantity": 0,
             },
         )
@@ -468,5 +509,15 @@ def inbound_putaway_complete(request, task_id: int):
         target_bin.save(update_fields=["current_capacity"])
         task.status = InboundPutawayTask.Status.DONE
         task.save(update_fields=["status"])
+
+        from .models import StockLedger
+        StockLedger.objects.create(
+            sku=task.sku,
+            movement_type=StockLedger.MovementType.PUTAWAY,
+            quantity=task.quantity,
+            to_bin=target_bin,
+            reference_id=f"PUTAWAY-{task.id}",
+            performed_by=request.user
+        )
     messages.success(request, "Put-away confirmed. Stock updated.")
     return redirect("/inbound/putaway/tasks/")

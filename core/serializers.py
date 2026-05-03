@@ -1,4 +1,4 @@
-from .models import Bin, Inventory, Level, Rack, SKU, Warehouse, Zone
+from .models import Aisle, Bin, Inventory, Level, Rack, SKU, Warehouse, Zone
 
 
 def warehouse_serializer(obj: Warehouse) -> dict:
@@ -20,13 +20,22 @@ def zone_serializer(obj: Zone) -> dict:
         "code": obj.code,
         "type": obj.type,
         "temperature": obj.temperature,
+        "is_hazardous": obj.is_hazardous,
+    }
+
+
+def aisle_serializer(obj: Aisle) -> dict:
+    return {
+        "id": obj.id,
+        "zone_id": obj.zone_id,
+        "aisle_number": obj.aisle_number,
     }
 
 
 def rack_serializer(obj: Rack) -> dict:
     return {
         "id": obj.id,
-        "zone_id": obj.zone_id,
+        "aisle_id": obj.aisle_id,
         "rack_number": obj.rack_number,
         "total_levels": obj.total_levels,
     }
@@ -42,8 +51,12 @@ def bin_serializer(obj: Bin) -> dict:
         "level_id": obj.level_id,
         "bin_code": obj.bin_code,
         "size": obj.size,
+        "bin_type": obj.bin_type,
+        "allow_mixed_skus": obj.allow_mixed_skus,
         "max_capacity": obj.max_capacity,
         "current_capacity": obj.current_capacity,
+        "max_weight": float(obj.max_weight),
+        "max_volume": float(obj.max_volume),
     }
 
 
@@ -53,6 +66,7 @@ def sku_serializer(obj: SKU) -> dict:
         "name": obj.name,
         "code": obj.sku_code,
         "category": obj.category,
+        "abc_class": obj.abc_class,
         "weight": float(obj.weight),
         "dimensions": obj.dimensions,
         "barcode": obj.barcode,
@@ -68,4 +82,6 @@ def inventory_serializer(obj: Inventory) -> dict:
         "warehouse": obj.warehouse.code,
         "zone": obj.zone.code if obj.zone_id else "",
         "bin": obj.bin.bin_code,
+        "batch_number": obj.batch_number,
+        "expiry_date": str(obj.expiry_date) if obj.expiry_date else None,
     }
