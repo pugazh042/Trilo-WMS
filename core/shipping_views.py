@@ -35,6 +35,19 @@ def carrier_selection(request, order_id: int):
     carriers = Carrier.objects.order_by("name")
 
     if request.method == "POST":
+        if request.POST.get("action") == "add_carrier":
+            name = (request.POST.get("carrier_name") or "").strip()
+            if not name:
+                messages.error(request, "Carrier name is required.")
+            else:
+                Carrier.objects.create(
+                    name=name,
+                    contact=(request.POST.get("carrier_contact") or "").strip(),
+                    service_type=(request.POST.get("service_type") or "").strip(),
+                )
+                messages.success(request, "Carrier added.")
+            return redirect(f"/shipping/{order.id}/carrier/")
+
         cid = request.POST.get("carrier_id")
         est = (request.POST.get("estimated_delivery") or "").strip()
         car = get_object_or_404(Carrier, pk=cid) if cid else None

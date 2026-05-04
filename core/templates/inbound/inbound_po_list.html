@@ -1,77 +1,56 @@
 {% extends "base.html" %}
-{% block title %}Trilo WMS — Inbound{% endblock %}
-{% block header_title %}Inbound (Purchase Orders){% endblock %}
+{% block title %}Purchase Orders{% endblock %}
+{% block header_title %}Purchase Orders{% endblock %}
 
 {% block content %}
-  <div class="stepper">
-    <span class="step active">PO Created</span><span class="step">Arrived</span><span class="step">Receiving</span><span class="step">QC</span><span class="step">Staging</span><span class="step">Completed</span>
-  </div>
   <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap">
     <div>
-      <div class="page-title">Inbound</div>
-      <div class="page-subtitle">Purchase Orders → Receiving → QC → Staging → Put-away</div>
+      <div class="page-title">Purchase Orders</div>
+      <div class="page-subtitle">Create and track supplier orders</div>
     </div>
     <a class="btn btn-primary" href="/inbound/create/">Create PO</a>
   </div>
 
-  <div class="card" style="margin-bottom: 16px;">
+  <div class="card" style="margin-bottom:16px">
     <div class="card-body">
-      <form method="get" style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
-        <div class="form-group" style="margin-bottom:0; flex:1; min-width:150px;">
+      <form method="get" style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:10px;align-items:end">
+        <div class="form-group" style="margin:0">
           <label class="form-label">Search</label>
-          <input type="text" name="search" class="form-control" placeholder="PO or Supplier" value="{{ search }}">
+          <input type="text" name="search" class="form-control" placeholder="PO or supplier" value="{{ search }}">
         </div>
-        <div class="form-group" style="margin-bottom:0; flex:1; min-width:150px;">
-          <label class="form-label">Supplier</label>
-          <input type="text" name="supplier" class="form-control" placeholder="Supplier name" value="{{ supplier }}">
-        </div>
-        <div class="form-group" style="margin-bottom:0; flex:1; min-width:120px;">
-          <label class="form-label">Date Start</label>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">From</label>
           <input type="date" name="date_start" class="form-control" value="{{ date_start }}">
         </div>
-        <div class="form-group" style="margin-bottom:0; flex:1; min-width:120px;">
-          <label class="form-label">Date End</label>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">To</label>
           <input type="date" name="date_end" class="form-control" value="{{ date_end }}">
         </div>
-        <div class="form-group" style="margin-bottom:0; flex:1; min-width:150px;">
-          <label class="form-label">Status</label>
-          <select name="status" class="form-control">
-            <option value="">All Statuses</option>
-            <option value="created" {% if status_filter == 'created' %}selected{% endif %}>Created</option>
-            <option value="arrived" {% if status_filter == 'arrived' %}selected{% endif %}>Arrived</option>
-            <option value="receiving" {% if status_filter == 'receiving' %}selected{% endif %}>Receiving</option>
-            <option value="qc" {% if status_filter == 'qc' %}selected{% endif %}>QC</option>
-            <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>Completed</option>
-          </select>
-        </div>
-        <button type="submit" class="btn btn-primary" style="height:42px;">Filter</button>
-        <a href="/inbound/" class="btn btn-outline" style="height:42px;">Clear</a>
+        <button type="submit" class="btn btn-outline">Filter</button>
       </form>
     </div>
   </div>
 
   <div class="card">
     <div class="card-body" style="padding:0">
-      <table style="width:100%; border-collapse:collapse">
+      <table style="width:100%;border-collapse:collapse">
         <thead>
-          <tr style="background:var(--bg); border-bottom:1px solid var(--border)">
-            <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">PO</th>
-            <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Supplier</th>
-            <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Expected</th>
-            <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Status</th>
-            <th style="text-align:right; padding:12px 16px; font-size:12px; color:var(--text-muted)">Open</th>
+          <tr style="background:var(--bg);border-bottom:1px solid var(--border)">
+            <th style="text-align:left;padding:12px 16px">PO</th>
+            <th style="text-align:left;padding:12px 16px">Supplier</th>
+            <th style="text-align:left;padding:12px 16px">Expected</th>
+            <th style="text-align:left;padding:12px 16px">Status</th>
+            <th style="text-align:right;padding:12px 16px">Action</th>
           </tr>
         </thead>
         <tbody>
           {% for po in orders %}
             <tr style="border-bottom:1px solid var(--border)">
-              <td style="padding:12px 16px; font-family:var(--mono); font-weight:700">{{ po.po_number }}</td>
+              <td style="padding:12px 16px;font-family:var(--mono);font-weight:700">{{ po.po_number }}</td>
               <td style="padding:12px 16px">{{ po.supplier_name }}</td>
-              <td style="padding:12px 16px" class="muted">{{ po.expected_delivery_date|default:"—" }}</td>
+              <td style="padding:12px 16px" class="muted">{{ po.expected_delivery_date|default:"-" }}</td>
               <td style="padding:12px 16px"><span class="badge badge-info">{{ po.get_status_display }}</span></td>
-              <td style="padding:12px 16px; text-align:right">
-                <a class="btn btn-primary btn-sm" href="/inbound/{{ po.id }}/dock/">View</a>
-              </td>
+              <td style="padding:12px 16px;text-align:right"><a class="btn btn-primary btn-sm" href="/inbound/{{ po.id }}/dock/">Open</a></td>
             </tr>
           {% empty %}
             <tr><td colspan="5" style="padding:16px" class="muted">No purchase orders yet.</td></tr>
@@ -81,4 +60,3 @@
     </div>
   </div>
 {% endblock %}
-

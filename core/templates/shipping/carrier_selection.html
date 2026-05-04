@@ -1,38 +1,70 @@
 {% extends "base.html" %}
-{% block title %}Trilo WMS — Carrier Selection{% endblock %}
-{% block header_title %}Carrier selection{% endblock %}
+{% block title %}Carrier Selection{% endblock %}
+{% block header_title %}Carrier Selection{% endblock %}
 
 {% block content %}
-  <div class="page-header">
-    <div class="page-title">{{ order.order_id }}</div>
-    <div class="page-subtitle">Step 1/3 · Select carrier</div>
+  <div class="page-header" style="display:flex;justify-content:space-between;gap:12px;align-items:flex-end;flex-wrap:wrap">
+    <div>
+      <div class="page-title">{{ order.order_id }}</div>
+      <div class="page-subtitle">Choose a carrier for dispatch</div>
+    </div>
+    <button class="btn btn-outline" type="button" onclick="toggleCarrierForm()">Add Carrier</button>
   </div>
 
-  <div class="card">
-    <div class="card-body">
-      <form method="post">
-        {% csrf_token %}
-        <div class="form-group">
-          <label class="form-label" for="carrier_id">Carrier</label>
-          <select class="form-control" id="carrier_id" name="carrier_id" required>
-            <option value="">Select carrier</option>
-            {% for c in carriers %}
-              <option value="{{ c.id }}" {% if shipment.carrier_partner_id == c.id %}selected{% endif %}>
-                {{ c.name }}{% if c.service_type %} ({{ c.service_type }}){% endif %}
-              </option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="estimated_delivery">Estimated delivery date</label>
-          <input class="form-control" id="estimated_delivery" name="estimated_delivery" type="date" value="{{ shipment.estimated_delivery|date:'Y-m-d' }}" />
-        </div>
-        <div style="display:flex; gap:10px; justify-content:flex-end">
-          <a class="btn btn-ghost" href="/shipping/">Back</a>
-          <button class="btn btn-primary" type="submit">Continue → Truck</button>
-        </div>
-      </form>
+  <div style="display:grid;grid-template-columns:1fr;gap:16px;align-items:start">
+    <div class="card" id="addCarrierCard" style="display:none">
+      <div class="card-header"><div class="card-title">Select Carrier</div></div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          <div class="form-group">
+            <label class="form-label" for="carrier_id">Carrier</label>
+            <select class="form-control" id="carrier_id" name="carrier_id" required>
+              <option value="">Select carrier</option>
+              {% for c in carriers %}
+                <option value="{{ c.id }}" {% if shipment.carrier_partner_id == c.id %}selected{% endif %}>{{ c.name }}{% if c.service_type %} - {{ c.service_type }}{% endif %}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="estimated_delivery">Estimated delivery</label>
+            <input class="form-control" id="estimated_delivery" name="estimated_delivery" type="date" value="{{ shipment.estimated_delivery|date:'Y-m-d' }}" />
+          </div>
+          <div style="display:flex;gap:10px;justify-content:flex-end">
+            <a class="btn btn-outline" href="/shipping/">Back</a>
+            <button class="btn btn-primary" type="submit">Continue</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><div class="card-title">Add Carrier</div></div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="add_carrier">
+          <div class="form-group">
+            <label class="form-label">Carrier name</label>
+            <input class="form-control" name="carrier_name" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Service type</label>
+            <input class="form-control" name="service_type" placeholder="Standard, Express">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Contact</label>
+            <input class="form-control" name="carrier_contact">
+          </div>
+          <button class="btn btn-outline" type="submit">Add Carrier</button>
+        </form>
+      </div>
     </div>
   </div>
+  <script>
+    function toggleCarrierForm() {
+      const card = document.getElementById('addCarrierCard');
+      card.style.display = card.style.display === 'none' ? 'block' : 'none';
+    }
+  </script>
 {% endblock %}
-

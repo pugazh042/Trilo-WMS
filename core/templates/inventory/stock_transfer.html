@@ -24,7 +24,7 @@
                         <select class="form-select" id="fromBinSelect" required>
                             <option value="">Select Source Bin...</option>
                             {% for bin in bins %}
-                            <option value="{{ bin.id }}">{{ bin.bin_code }} (Cap: {{ bin.current_capacity }}/{{ bin.max_capacity|default:'∞' }})</option>
+                            <option value="{{ bin.id }}">{{ bin.bin_code }} (Cap: {{ bin.current_capacity }}/{{ bin.max_capacity|default:'unlimited' }})</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -33,7 +33,7 @@
                         <select class="form-select" id="toBinSelect" required>
                             <option value="">Select Destination Bin...</option>
                             {% for bin in bins %}
-                            <option value="{{ bin.id }}">{{ bin.bin_code }} (Cap: {{ bin.current_capacity }}/{{ bin.max_capacity|default:'∞' }})</option>
+                            <option value="{{ bin.id }}">{{ bin.bin_code }} (Cap: {{ bin.current_capacity }}/{{ bin.max_capacity|default:'unlimited' }})</option>
                             {% endfor %}
                         </select>
                     </div>

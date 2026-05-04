@@ -12,6 +12,7 @@
         <div class="form-group"><label class="form-label">Code</label><input class="form-control" name="code" required></div>
         <div class="form-group"><label class="form-label">Type</label><select class="form-control" name="type"><option value="bulk">Bulk</option><option value="discrete">Discrete</option></select></div>
         <div class="form-group"><label class="form-label">Category</label><input class="form-control" name="category" placeholder="e.g. Electronics, Grocery"></div>
+        <label style="display:flex;gap:8px;align-items:center;margin-bottom:16px"><input type="checkbox" name="is_hazardous"> Hazardous zone</label>
         <button class="btn btn-primary" type="submit">Save Zone</button>
       </form>
     </div>
@@ -27,6 +28,7 @@
           <th style="text-align:left; padding:12px 16px; font-size:12px; color:var(--text-muted)">Name</th>
           <th style="text-align:center; padding:12px 16px; font-size:12px; color:var(--text-muted)">Type</th>
           <th style="text-align:center; padding:12px 16px; font-size:12px; color:var(--text-muted)">Temp</th>
+          <th style="text-align:center; padding:12px 16px; font-size:12px; color:var(--text-muted)">Hazard</th>
           <th style="text-align:right; padding:12px 16px; font-size:12px; color:var(--text-muted)">Action</th>
         </tr>
         {% for z in zones %}
@@ -48,6 +50,7 @@
                 <option value="cold" {% if z.temperature == 'cold' %}selected{% endif %}>Cold</option>
               </select>
             </td>
+            <td style="padding:12px 16px; text-align:center;">{% if z.is_hazardous %}Yes{% else %}No{% endif %}</td>
             <td style="padding:12px 16px; text-align:right;">
               <button class="btn btn-outline btn-sm delete-btn" data-id="{{ z.id }}" data-url="/zone/{{ z.id }}/delete">Delete</button>
             </td>

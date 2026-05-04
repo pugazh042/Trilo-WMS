@@ -48,10 +48,10 @@
           </div>
 
           <div class="nav-dropdown">
-            <button class="nav-item nav-dropdown-btn {% if request.path|slice:":11" == '/inventory/' %}active{% endif %}">
+            <a class="nav-item nav-dropdown-btn {% if request.path|slice:":11" == '/inventory/' %}active{% endif %}" href="/inventory/">
               <span class="nav-icon">📦</span> Inventory
               <span class="nav-dropdown-arrow">▼</span>
-            </button>
+            </a>
             <div class="nav-dropdown-content">
               <a class="nav-dropdown-item {% if request.path == '/inventory/' %}active{% endif %}" href="/inventory/">Inventory List</a>
               <a class="nav-dropdown-item {% if request.path == '/inventory/skus/' %}active{% endif %}" href="/inventory/skus/">SKUs</a>
@@ -74,14 +74,16 @@
           </div>
 
           <div class="nav-dropdown">
-            <button class="nav-item nav-dropdown-btn {% if request.path|slice:":8" == '/orders/' or request.path|slice:":12" == '/allocation/' or request.path|slice:":15" == '/consolidation/' or request.path|slice:":10" == '/shipping/' %}active{% endif %}">
+            <button class="nav-item nav-dropdown-btn {% if request.path|slice:":8" == '/orders/' or request.path|slice:":12" == '/allocation/' or request.path|slice:":9" == '/picking/' or request.path|slice:":15" == '/consolidation/' or request.path|slice:":10" == '/shipping/' or request.path|slice:":9" == '/packing/' %}active{% endif %}">
               <span class="nav-icon">📋</span> Outbound
               <span class="nav-dropdown-arrow">▼</span>
             </button>
             <div class="nav-dropdown-content">
               <a class="nav-dropdown-item {% if request.path == '/orders/' %}active{% endif %}" href="/orders/">Orders</a>
               <a class="nav-dropdown-item {% if request.path == '/allocation/' %}active{% endif %}" href="/allocation/">Allocation</a>
+              <a class="nav-dropdown-item {% if request.path == '/picking/tasks/' %}active{% endif %}" href="/picking/tasks/">Pick Tasks</a>
               <a class="nav-dropdown-item {% if request.path == '/consolidation/' %}active{% endif %}" href="/consolidation/">Consolidation</a>
+              <a class="nav-dropdown-item {% if request.path == '/packing/queue/' %}active{% endif %}" href="/packing/queue/">Packing Queue</a>
               <a class="nav-dropdown-item {% if request.path == '/shipping/' %}active{% endif %}" href="/shipping/">Shipping</a>
             </div>
           </div>
@@ -92,12 +94,13 @@
         {% endif %}
         {% if request.user.role == 'admin' %}
           <div class="nav-dropdown">
-            <button class="nav-item nav-dropdown-btn {% if request.path|slice:":11" == '/inventory/' %}active{% endif %}">
+            <a class="nav-item nav-dropdown-btn {% if request.path|slice:":11" == '/inventory/' %}active{% endif %}" href="/inventory/">
               <span class="nav-icon">📦</span> Inventory
               <span class="nav-dropdown-arrow">▼</span>
-            </button>
+            </a>
             <div class="nav-dropdown-content">
               <a class="nav-dropdown-item {% if request.path == '/inventory/' %}active{% endif %}" href="/inventory/">Inventory List</a>
+              <a class="nav-dropdown-item {% if request.path == '/inventory/skus/' %}active{% endif %}" href="/inventory/skus/">SKUs</a>
               <a class="nav-dropdown-item {% if request.path == '/inventory/barcode/' %}active{% endif %}" href="/inventory/barcode/">Barcode Generator</a>
               <a class="nav-dropdown-item {% if request.path == '/inventory/adjustment/' %}active{% endif %}" href="/inventory/adjustment/">Stock Adjustment</a>
             </div>
@@ -120,6 +123,15 @@
           </a>
           <a class="nav-item {% if request.path|slice:":12" == '/allocation/' %}active{% endif %}" href="/allocation/">
             <span class="nav-icon">🎯</span> Allocation
+          </a>
+          <a class="nav-item {% if request.path == '/picking/tasks/' %}active{% endif %}" href="/picking/tasks/">
+            <span class="nav-icon">🧾</span> Pick Tasks
+          </a>
+          <a class="nav-item {% if request.path|slice:":15" == '/consolidation/' %}active{% endif %}" href="/consolidation/">
+            <span class="nav-icon">📥</span> Consolidation
+          </a>
+          <a class="nav-item {% if request.path == '/packing/queue/' %}active{% endif %}" href="/packing/queue/">
+            <span class="nav-icon">📦</span> Packing Queue
           </a>
           <a class="nav-item {% if request.path|slice:":10" == '/shipping/' %}active{% endif %}" href="/shipping/">
             <span class="nav-icon">🚚</span> Shipping

@@ -55,6 +55,8 @@ def bin_serializer(obj: Bin) -> dict:
         "allow_mixed_skus": obj.allow_mixed_skus,
         "max_capacity": obj.max_capacity,
         "current_capacity": obj.current_capacity,
+        "weight_capacity": float(obj.weight_capacity),
+        "volume_capacity": float(obj.volume_capacity),
         "max_weight": float(obj.max_weight),
         "max_volume": float(obj.max_volume),
     }

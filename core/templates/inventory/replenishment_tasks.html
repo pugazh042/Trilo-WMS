@@ -22,8 +22,8 @@
                 <tr>
                     <td>{{ task.created_at|date:"M d, H:i" }}</td>
                     <td>
-                        {% if task.status == 'pending' %}
-                            <span class="badge bg-warning text-dark">Pending</span>
+                        {% if task.status == 'open' %}
+                            <span class="badge bg-warning text-dark">Open</span>
                         {% elif task.status == 'in_progress' %}
                             <span class="badge bg-primary">In Progress</span>
                         {% else %}
@@ -32,8 +32,8 @@
                     </td>
                     <td><strong>{{ task.sku.sku_code }}</strong><br><small class="text-muted">{{ task.sku.name }}</small></td>
                     <td><span class="badge bg-info rounded-pill">{{ task.quantity }}</span></td>
-                    <td>{{ task.from_bin.bin_code|default:"-" }}</td>
-                    <td>{{ task.to_bin.bin_code|default:"-" }}</td>
+                    <td>{{ task.source_bin.bin_code|default:"-" }}</td>
+                    <td>{{ task.destination_bin.bin_code|default:"-" }}</td>
                     <td>{{ task.assigned_to.username|default:"Unassigned" }}</td>
                 </tr>
                 {% empty %}

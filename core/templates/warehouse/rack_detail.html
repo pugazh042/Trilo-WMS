@@ -83,39 +83,28 @@
 </style>
 
 <div class="mb-3">
-    <a href="/warehouse/layout/" class="btn btn-outline-secondary btn-sm">&larr; Back to Map</a>
+    <a href="/warehouse/layout/" class="btn btn-outline btn-sm">Back to Map</a>
 </div>
 
 <div class="card">
     <div class="card-body">
-        <h5 class="card-title">Location: {{ rack.aisle.zone.code }} &rarr; Aisle {{ rack.aisle.aisle_number }} &rarr; Rack {{ rack.rack_number }}</h5>
+        <h5 class="card-title">Location: {{ rack.aisle.zone.code }} / Aisle {{ rack.aisle.aisle_number }} / Rack {{ rack.rack_number }}</h5>
         <div class="text-muted small mb-4">Total Levels: {{ rack.total_levels }}</div>
         
         <div class="rack-container">
             {% for level in levels %}
             <div class="rack-level">
-                <div class="level-label">L{{ level.level_number }}</div>
+                <div class="level-label">S{{ level.level_number }}</div>
                 <div class="bin-grid">
                     {% for bin in level.bins_data %}
-                        {% if bin.current_capacity >= bin.max_capacity and bin.max_capacity > 0 %}
-                            {% set bin_class = 'bin-full' %}
-                            {% set pct = 100 %}
-                        {% elif bin.current_capacity > 0 %}
-                            {% set bin_class = 'bin-partial' %}
-                            {% set pct = bin.usage_pct %}
-                        {% else %}
-                            {% set bin_class = 'bin-empty' %}
-                            {% set pct = 0 %}
-                        {% endif %}
-                        
-                        <div class="bin-box {{ bin_class }}" onclick="showBinDetails('{{ bin.id }}')">
+                        <div class="bin-box {{ bin.status_class }}" onclick="showBinDetails('{{ bin.id }}')">
                             <div class="bin-header">{{ bin.bin_code }}</div>
                             <div class="bin-body">
                                 <div>Cap: {{ bin.current_capacity }}/{{ bin.max_capacity|default:"&infin;" }}</div>
                                 <div>Items: {{ bin.inventory|length }}</div>
                             </div>
                             <div class="bin-capacity-bar">
-                                <div class="bin-capacity-fill" style="width: {{ pct }}%"></div>
+                                <div class="bin-capacity-fill" style="width: {{ bin.usage_pct }}%"></div>
                             </div>
                         </div>
                     {% empty %}
@@ -129,29 +118,20 @@
 </div>
 
 <!-- Modal for Bin Details -->
-<div class="modal fade" id="binModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
+<div id="binModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:50;align-items:center;justify-content:center;padding:20px">
+  <div style="width:min(620px,100%);background:#fff;border-radius:8px;box-shadow:0 20px 60px rgba(15,23,42,.25)">
       <div class="modal-header">
         <h5 class="modal-title" id="binModalTitle">Bin Details</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="closeBinModal()">Close</button>
       </div>
       <div class="modal-body" id="binModalBody">
         Loading...
       </div>
-    </div>
   </div>
 </div>
 
 <script>
-// Use the data embedded in the context to show modal (we passed it directly to avoid extra fetches if possible)
-const binData = {
-    {% for level in levels %}
-        {% for bin in level.bins_data %}
-            "{{ bin.id }}": {{ bin|safe }},
-        {% endfor %}
-    {% endfor %}
-};
+const binData = {{ bins_json|safe }};
 
 function showBinDetails(binId) {
     const bin = binData[binId];
@@ -160,35 +140,66 @@ function showBinDetails(binId) {
     document.getElementById('binModalTitle').textContent = `Bin: ${bin.bin_code}`;
     
     let html = `
-        <table class="table table-sm">
+        <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
             <tr><th>Size</th><td>${bin.size}</td></tr>
             <tr><th>Type</th><td>${bin.bin_type}</td></tr>
             <tr><th>Usage</th><td>${bin.current_capacity} / ${bin.max_capacity || 'Unlimited'}</td></tr>
+            <tr><th>Weight cap</th><td>${bin.weight_capacity || 'Unlimited'}</td></tr>
+            <tr><th>Volume cap</th><td>${bin.volume_capacity || 'Unlimited'}</td></tr>
+            <tr><th>Mixed SKUs</th><td>${bin.allow_mixed_skus ? 'Allowed' : 'Not allowed'}</td></tr>
         </table>
         <h6>Inventory</h6>
-        <ul class="list-group list-group-flush mb-3">
+        <ul style="list-style:none;padding:0;margin:0 0 16px">
     `;
     
     if (bin.inventory && bin.inventory.length > 0) {
         bin.inventory.forEach(inv => {
-            html += `<li class="list-group-item d-flex justify-content-between align-items-center">
+            html += `<li style="display:flex;justify-content:space-between;border-bottom:1px solid #e2e8f0;padding:8px 0">
                 ${inv.sku}
-                <span class="badge bg-primary rounded-pill">${inv.qty}</span>
+                <span>${inv.qty}</span>
             </li>`;
         });
     } else {
-        html += `<li class="list-group-item text-muted">Empty</li>`;
+        html += `<li class="text-muted">Empty</li>`;
     }
     
     html += `</ul>`;
     
-    // Add transfer button placeholder
     if (bin.inventory && bin.inventory.length > 0) {
-        html += `<button class="btn btn-warning btn-sm w-100" onclick="alert('Internal transfer functionality pending.')">Transfer Stock</button>`;
+        const firstSku = bin.inventory[0];
+        html += `
+          <form onsubmit="submitTransfer(event, '${bin.id}', '${firstSku.sku_id}')" style="display:grid;gap:10px">
+            <input class="form-control" name="quantity" type="number" min="1" max="${firstSku.qty}" value="1" required>
+            <select class="form-control" name="to_bin_id" required>
+              <option value="">Destination bin...</option>
+              {% for b in all_bins %}<option value="{{ b.id }}">{{ b.bin_code }}</option>{% endfor %}
+            </select>
+            <button class="btn btn-primary" type="submit">Internal Transfer</button>
+          </form>`;
     }
     
     document.getElementById('binModalBody').innerHTML = html;
-    new bootstrap.Modal(document.getElementById('binModal')).show();
+    document.getElementById('binModal').style.display = 'flex';
+}
+
+function closeBinModal() {
+    document.getElementById('binModal').style.display = 'none';
+}
+
+function submitTransfer(event, fromBinId, skuId) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const fd = new FormData(form);
+    fd.append('from_bin_id', fromBinId);
+    fd.append('sku_id', skuId);
+    fd.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    fetch('/api/inventory/transfer', { method: 'POST', body: fd })
+        .then(res => res.json())
+        .then(data => {
+            if (data.ok) window.location.reload();
+            else alert(data.error || 'Transfer failed');
+        })
+        .catch(() => alert('Transfer failed'));
 }
 </script>
 {% endblock %}

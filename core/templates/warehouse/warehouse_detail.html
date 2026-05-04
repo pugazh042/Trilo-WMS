@@ -42,21 +42,25 @@ function render(data){
   cache = data;
   const z = data.zones||[];
   const html = z.map(zone=>{
-    const racks = (zone.racks||[]).map(rack=>{
+    const aisles = (zone.aisles||[]).map(aisle=>{
+      const racks = (aisle.racks||[]).map(rack=>{
       const levels = (rack.levels||[]).map(level=>{
         const bins = (level.bins||[]).map(bin=>`<div style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;margin:6px 0;display:flex;justify-content:space-between;gap:10px"><div><div style="font-family:var(--mono)">${bin.bin_code}</div><div class="muted">${bin.current_capacity}/${bin.max_capacity} used</div></div><button class="btn btn-outline btn-sm" onclick='showDetails("bin",${JSON.stringify(bin)})'>View</button></div>`).join('');
-        return node(`Level ${level.level_number}`, `<div style="margin:6px 0"><button class="btn btn-outline btn-sm" onclick="generateBins(${level.id})">Generate Bins</button></div>${bins}`, `level-${level.id}`);
+        return node(`Shelf ${level.level_number}`, `<div style="margin:6px 0"><button class="btn btn-outline btn-sm" onclick="generateBins(${level.id})">Generate Bins</button></div>${bins}`, `level-${level.id}`);
       }).join('');
       return node(`Rack ${rack.rack_number}`, `<div style="margin:6px 0"><button class="btn btn-outline btn-sm" onclick='showDetails("rack",${JSON.stringify(rack)})'>Details</button></div>${levels}`, `rack-${rack.id}`);
     }).join('');
-    return `<div class="card" style="padding:12px;margin-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:center"><div><b>${zone.name}</b> <span class="muted">(${zone.code})</span></div><div style="display:flex;gap:6px"><button class="btn btn-outline btn-sm" onclick='showDetails("zone",${JSON.stringify(zone)})'>Details</button><button class="btn btn-outline btn-sm" onclick="addRack(${zone.id})">Add Rack</button></div></div><div style="margin-top:8px">${racks||'<span class="muted">No racks</span>'}</div></div>`;
+      return node(`Aisle ${aisle.aisle_number}`, `<div style="margin:6px 0"><button class="btn btn-outline btn-sm" onclick="addRack(${aisle.id})">Add Rack</button></div>${racks||'<span class="muted">No racks</span>'}`, `aisle-${aisle.id}`);
+    }).join('');
+    return `<div class="card" style="padding:12px;margin-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:center"><div><b>${zone.name}</b> <span class="muted">(${zone.code})</span></div><div style="display:flex;gap:6px"><button class="btn btn-outline btn-sm" onclick='showDetails("zone",${JSON.stringify(zone)})'>Details</button><button class="btn btn-outline btn-sm" onclick="addAisle(${zone.id})">Add Aisle</button></div></div><div style="margin-top:8px">${aisles||'<span class="muted">No aisles</span>'}</div></div>`;
   }).join('');
   document.getElementById('treeWrap').innerHTML = html || '<div class="muted">No zones yet. Click "Add Zone".</div>';
 }
 async function refreshTree(){const r = await fetch(`/warehouse/${whId}/hierarchy`); render(await r.json());}
 function showDetails(type,obj){document.getElementById('detailsPane').innerHTML = detailsHtml(type,obj);}
 async function addZone(){const name=prompt('Zone name'); if(!name) return; const code=prompt('Zone code','Z1'); if(!code) return; await post('/zone/create',{warehouse_id:whId,name,code,type:'bulk',temperature:'normal'}); refreshTree();}
-async function addRack(zoneId){const rack_number=prompt('Rack number','R1'); if(!rack_number) return; const total_levels=prompt('Total levels','3'); await post('/rack/create',{zone_id:zoneId,rack_number,total_levels}); refreshTree();}
+async function addAisle(zoneId){const aisle_number=prompt('Aisle number','03'); if(!aisle_number) return; await post('/aisle/create',{zone_id:zoneId,aisle_number}); refreshTree();}
+async function addRack(aisleId){const rack_number=prompt('Rack number','02'); if(!rack_number) return; const total_levels=prompt('Total shelves','3'); await post('/rack/create',{aisle_id:aisleId,rack_number,total_levels}); refreshTree();}
 async function generateBins(levelId){const bins_per_level=prompt('Bins per level','4'); if(!bins_per_level) return; await post('/bin/generate',{level_id:levelId,bins_per_level,size:'M',max_capacity:100}); refreshTree();}
 async function editZone(id,name,type,temp){const n=prompt('Zone name',name); if(!n) return; await post(`/zone/${id}/update`,{name:n,type,temperature:temp}); refreshTree();}
 async function editRack(id,num,lv){const n=prompt('Rack number',num); if(!n) return; const t=prompt('Total levels',lv); await post(`/rack/${id}/update`,{rack_number:n,total_levels:t}); refreshTree();}

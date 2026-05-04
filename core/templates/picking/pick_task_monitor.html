@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Pick Tasks{% endblock %}
+{% block header_title %}Pick Tasks{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div class="page-title">Pick Tasks</div>
+    <div class="page-subtitle">Allocation output by picker and status</div>
+  </div>
+
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="background:var(--bg);border-bottom:1px solid var(--border)">
+            <th style="text-align:left;padding:12px 16px">Task</th>
+            <th style="text-align:left;padding:12px 16px">Order</th>
+            <th style="text-align:left;padding:12px 16px">SKU</th>
+            <th style="text-align:right;padding:12px 16px">Qty</th>
+            <th style="text-align:left;padding:12px 16px">Picker</th>
+            <th style="text-align:left;padding:12px 16px">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in tasks %}
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:12px 16px;font-family:var(--mono)">PT{{ t.id }}</td>
+              <td style="padding:12px 16px;font-family:var(--mono);font-weight:700">{{ t.order.order_id }}</td>
+              <td style="padding:12px 16px;font-family:var(--mono)">{{ t.sku.sku_code }}</td>
+              <td style="padding:12px 16px;text-align:right;font-family:var(--mono)">{{ t.quantity }}</td>
+              <td style="padding:12px 16px">{% if t.picker %}{{ t.picker.get_full_name|default:t.picker.username }}{% else %}Unassigned{% endif %}</td>
+              <td style="padding:12px 16px"><span class="badge badge-purple">{{ t.get_status_display }}</span></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" style="padding:16px" class="muted">No pick tasks yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}

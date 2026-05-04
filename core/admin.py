@@ -7,6 +7,8 @@ from .models import (
     Consolidation,
     GoodsReceipt,
     InboundPutawayTask,
+    Aisle,
+    Bin,
     Location,
     Order,
     OrderItem,
@@ -19,10 +21,17 @@ from .models import (
     Shipment,
     ShipmentItem,
     SKU,
+    StockAdjustment,
     StockBin,
+    StockLedger,
     Task,
     TruckAssignment,
     StagingItem,
+    Rack,
+    Level,
+    ReplenishmentTask,
+    Warehouse,
+    Zone,
 )
 
 User = get_user_model()
@@ -38,8 +47,16 @@ class UserAdmin(DjangoUserAdmin):
 
 
 admin.site.register(SKU)
+admin.site.register(Warehouse)
+admin.site.register(Zone)
+admin.site.register(Aisle)
+admin.site.register(Rack)
+admin.site.register(Level)
+admin.site.register(Bin)
 admin.site.register(Location)
 admin.site.register(StockBin)
+admin.site.register(StockLedger)
+admin.site.register(StockAdjustment)
 admin.site.register(Order)
 admin.site.register(OrderItem)
 admin.site.register(Task)
@@ -57,3 +74,4 @@ admin.site.register(GoodsReceipt)
 admin.site.register(QCCheck)
 admin.site.register(StagingItem)
 admin.site.register(InboundPutawayTask)
+admin.site.register(ReplenishmentTask)

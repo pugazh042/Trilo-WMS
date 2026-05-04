@@ -1,32 +1,36 @@
 {% extends "base.html" %}
-{% block title %}Trilo WMS — Packing queue{% endblock %}
-{% block header_title %}Packing{% endblock %}
+{% block title %}Packing Queue{% endblock %}
+{% block header_title %}Packing Queue{% endblock %}
 
 {% block content %}
   <div class="page-header">
-    <div class="page-title">Packing queue</div>
-    <div class="page-subtitle">Orders ready to pack</div>
+    <div class="page-title">Packing Queue</div>
+    <div class="page-subtitle">Packing progress by order</div>
   </div>
 
   <div class="card">
     <div class="card-body" style="padding:0">
-      <table style="width:100%; border-collapse:collapse">
+      <table style="width:100%;border-collapse:collapse">
         <thead>
-          <tr style="background:var(--bg); border-bottom:1px solid var(--border)">
-            <th style="text-align:left; padding:12px 16px">Order</th>
-            <th style="text-align:left; padding:12px 16px">Status</th>
-            <th style="text-align:right; padding:12px 16px">Action</th>
+          <tr style="background:var(--bg);border-bottom:1px solid var(--border)">
+            <th style="text-align:left;padding:12px 16px">Order</th>
+            <th style="text-align:left;padding:12px 16px">Customer</th>
+            <th style="text-align:left;padding:12px 16px">Packed By</th>
+            <th style="text-align:left;padding:12px 16px">Box</th>
+            <th style="text-align:left;padding:12px 16px">Status</th>
           </tr>
         </thead>
         <tbody>
           {% for p in rows %}
             <tr style="border-bottom:1px solid var(--border)">
-              <td style="padding:12px 16px; font-family:var(--mono); font-weight:700">{{ p.order.order_id }}</td>
+              <td style="padding:12px 16px;font-family:var(--mono);font-weight:700">{{ p.order.order_id }}</td>
+              <td style="padding:12px 16px">{{ p.order.customer_name }}</td>
+              <td style="padding:12px 16px">{% if p.packed_by %}{{ p.packed_by.get_full_name|default:p.packed_by.username }}{% else %}Unassigned{% endif %}</td>
+              <td style="padding:12px 16px">{{ p.box_type|default:"-" }}</td>
               <td style="padding:12px 16px"><span class="badge badge-purple">{{ p.get_status_display }}</span></td>
-              <td style="padding:12px 16px; text-align:right"><a class="btn btn-primary btn-sm" href="/packing/{{ p.order.id }}/">Pack</a></td>
             </tr>
           {% empty %}
-            <tr><td colspan="3" style="padding:16px" class="muted">Nothing to pack.</td></tr>
+            <tr><td colspan="5" style="padding:16px" class="muted">Nothing in packing.</td></tr>
           {% endfor %}
         </tbody>
       </table>

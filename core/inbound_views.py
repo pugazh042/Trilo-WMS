@@ -5,7 +5,7 @@ from __future__ import annotations
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
@@ -23,6 +23,7 @@ from .models import (
     SKU,
     StagingItem,
     User,
+    Zone,
 )
 from .utils import now_date_str
 
@@ -42,36 +43,103 @@ def _suggested_location_for_sku(sku_id: int, suggested_bin: Bin | None = None) -
     return Location.objects.order_by("code").first()
 
 
+def _bin_accepts_sku(bin_obj: Bin, sku: SKU, quantity: int = 0) -> bool:
+    if bin_obj.max_capacity > 0 and (bin_obj.current_capacity + quantity) > bin_obj.max_capacity:
+        return False
+    if bin_obj.weight_capacity > 0 and sku.weight > 0 and (sku.weight * quantity) > bin_obj.weight_capacity:
+        return False
+    existing_skus = set(
+        Inventory.objects.filter(bin=bin_obj, quantity__gt=0).values_list("sku_id", flat=True)
+    )
+    if existing_skus and sku.id not in existing_skus and not bin_obj.allow_mixed_skus:
+        return False
+    return True
+
+
+def _sku_storage_size(sku: SKU) -> str:
+    if sku.unit_type == SKU.UnitType.PALLET or sku.weight >= 30:
+        return Bin.Size.LARGE
+    if sku.unit_type == SKU.UnitType.BOX or sku.weight >= 10:
+        return Bin.Size.MEDIUM
+    return Bin.Size.SMALL
+
+
+def _preferred_bin_types(sku: SKU) -> list[str]:
+    if sku.unit_type == SKU.UnitType.PALLET:
+        return [Bin.BinType.PALLET]
+    if sku.unit_type == SKU.UnitType.BOX:
+        return [Bin.BinType.CARTON, Bin.BinType.SHELF]
+    return [Bin.BinType.SHELF, Bin.BinType.LOOSE, Bin.BinType.CARTON]
+
+
+def _bin_score(bin_obj: Bin, sku: SKU, quantity: int) -> int:
+    if not _bin_accepts_sku(bin_obj, sku, quantity):
+        return -1
+
+    zone = bin_obj.level.rack.aisle.zone
+    score = 0
+    free_units = 999999 if bin_obj.max_capacity == 0 else max(0, bin_obj.max_capacity - bin_obj.current_capacity)
+    desired_size = _sku_storage_size(sku)
+    preferred_types = _preferred_bin_types(sku)
+
+    if sku.category and zone.category.lower() == sku.category.lower():
+        score += 70
+    elif sku.category and sku.category.lower() in zone.category.lower():
+        score += 40
+    elif not zone.category:
+        score += 10
+
+    if sku.abc_class == SKU.ABCClass.A and (
+        "fast" in zone.category.lower()
+        or "pick" in zone.category.lower()
+        or zone.type == Zone.Type.DISCRETE
+    ):
+        score += 35
+
+    if bin_obj.bin_type in preferred_types:
+        score += 30
+    if bin_obj.size == desired_size:
+        score += 20
+    elif desired_size == Bin.Size.SMALL and bin_obj.size == Bin.Size.MEDIUM:
+        score += 8
+    elif desired_size == Bin.Size.MEDIUM and bin_obj.size == Bin.Size.LARGE:
+        score += 8
+
+    if Inventory.objects.filter(bin=bin_obj, sku=sku, quantity__gt=0).exists():
+        score += 25
+    if bin_obj.current_capacity == 0:
+        score += 12
+    score += min(20, free_units)
+    score -= bin_obj.current_capacity
+    return score
+
+
 def _suggested_bin_for_sku(sku: SKU, quantity: int = 0) -> Bin | None:
-    qs = Bin.objects.select_related("level__rack__aisle__zone__warehouse").order_by("current_capacity", "bin_code")
-    
-    sku_category = sku.category
-    
-    # 1. Exact match on Zone Category
-    if sku_category:
-        category_bins = qs.filter(level__rack__aisle__zone__category__iexact=sku_category)
-        for b in category_bins:
-            if b.max_capacity == 0 or (b.max_capacity - b.current_capacity) >= quantity:
-                return b
+    candidates = Bin.objects.select_related("level__rack__aisle__zone__warehouse").order_by("bin_code")
+    ranked = [(_bin_score(bin_obj, sku, quantity), bin_obj) for bin_obj in candidates]
+    ranked = [item for item in ranked if item[0] >= 0]
+    if not ranked:
+        return None
+    ranked.sort(key=lambda item: (-item[0], item[1].current_capacity, item[1].bin_code))
+    return ranked[0][1]
 
-        # 2. Partial match on Zone Category
-        partial_bins = qs.filter(level__rack__aisle__zone__category__icontains=sku_category)
-        for b in partial_bins:
-            if b.max_capacity == 0 or (b.max_capacity - b.current_capacity) >= quantity:
-                return b
 
-    # 3. Fallback to zones with NO specific category (general zones)
-    general_bins = qs.filter(level__rack__aisle__zone__category="")
-    for b in general_bins:
-        if b.max_capacity == 0 or (b.max_capacity - b.current_capacity) >= quantity:
-            return b
-
-    # 4. Fallback to any available bin
-    for b in qs:
-        # max_capacity=0 is treated as no configured cap.
-        if b.max_capacity == 0 or (b.max_capacity - b.current_capacity) >= quantity:
-            return b
-    return qs.first()
+def _free_putaway_worker() -> User | None:
+    workers = list(
+        User.objects.filter(role=User.Role.PUTAWAY, is_active=True).annotate(
+            open_putaway_count=Count(
+                "inbound_putaway_tasks",
+                filter=Q(inbound_putaway_tasks__status__in=[
+                    InboundPutawayTask.Status.OPEN,
+                    InboundPutawayTask.Status.IN_PROGRESS,
+                ]),
+            )
+        )
+    )
+    if not workers:
+        return None
+    workers.sort(key=lambda worker: (worker.open_putaway_count, worker.id))
+    return workers[0]
 
 
 @login_required
@@ -138,8 +206,8 @@ def create_po(request):
             sku = SKU.objects.filter(id=int(sku_id)).first()
             if sku:
                 PurchaseOrderItem.objects.create(purchase_order=po, sku=sku, expected_qty=q)
-    messages.success(request, f"PO {po.po_number} created.")
-    return redirect(f"/inbound/{po.id}/")
+    messages.success(request, f"PO {po.po_number} created successfully.")
+    return redirect("/inbound/")
 
 
 @login_required
@@ -156,17 +224,67 @@ def inbound_dock_arrival_list(request):
 @role_required("admin", "manager")
 @require_http_methods(["GET", "POST"])
 def dock_arrival(request, po_id: int):
-    po = get_object_or_404(PurchaseOrder, pk=po_id)
+    po = get_object_or_404(PurchaseOrder.objects.prefetch_related("lines__sku"), pk=po_id)
     if request.method == "POST":
+        action = request.POST.get("action") or "save_arrival"
         po.dock_number = (request.POST.get("dock_number") or "").strip()
+
+        if action == "save_arrival":
+            if po.status == PurchaseOrder.Status.CREATED:
+                po.status = PurchaseOrder.Status.ARRIVED
+                po.save(update_fields=["dock_number", "status"])
+            else:
+                po.save(update_fields=["dock_number"])
+            messages.success(request, "Arrival details saved.")
+            return redirect(f"/inbound/{po.id}/dock/")
+
         if po.status == PurchaseOrder.Status.CREATED:
             po.status = PurchaseOrder.Status.ARRIVED
+
+        received_total = 0
+        with transaction.atomic():
+            gr = GoodsReceipt.objects.filter(
+                purchase_order=po,
+                status=GoodsReceipt.Status.IN_PROGRESS,
+            ).first()
+            if not gr:
+                gr = GoodsReceipt.objects.create(
+                    purchase_order=po,
+                    received_by=request.user,
+                    status=GoodsReceipt.Status.IN_PROGRESS,
+                )
+
+            for line in po.lines.select_for_update():
+                raw = request.POST.get(f"recv_{line.id}") or "0"
+                batch = (request.POST.get(f"batch_{line.id}") or "").strip()
+                try:
+                    received_qty = int(raw)
+                except Exception:
+                    received_qty = 0
+                received_qty = max(0, received_qty)
+                if received_qty > line.expected_qty:
+                    messages.error(request, f"Cannot receive more than expected for {line.sku.sku_code}.")
+                    return redirect(f"/inbound/{po.id}/dock/")
+                line.received_qty = received_qty
+                line.received_batch = batch
+                line.save(update_fields=["received_qty", "received_batch"])
+                received_total += received_qty
+
+            if received_total <= 0:
+                messages.error(request, "Enter received quantity for at least one SKU.")
+                return redirect(f"/inbound/{po.id}/dock/")
+
+            gr.received_at = timezone.now()
+            gr.status = GoodsReceipt.Status.COMPLETED
+            gr.save(update_fields=["received_at", "status"])
+            po.status = PurchaseOrder.Status.QC
             po.save(update_fields=["dock_number", "status"])
-        else:
-            po.save(update_fields=["dock_number"])
-        messages.success(request, "Dock recorded. PO marked arrived.")
-        return redirect(f"/inbound/{po.id}/dock/")
-    return render(request, "inbound/dock_arrival.html", {"po": po, "today_str": now_date_str()})
+
+        messages.success(request, "Goods receipt saved. PO moved to QC.")
+        return redirect(f"/inbound/{po.id}/qc/")
+
+    gr = GoodsReceipt.objects.filter(purchase_order=po).order_by("-id").first()
+    return render(request, "inbound/dock_arrival.html", {"po": po, "gr": gr, "today_str": now_date_str()})
 
 
 @login_required
@@ -355,26 +473,25 @@ def staging_area(request, po_id: int):
 @require_http_methods(["POST"])
 def create_putaway_tasks(request, po_id: int):
     po = get_object_or_404(PurchaseOrder, pk=po_id)
-    workers = list(User.objects.filter(role=User.Role.PUTAWAY, is_active=True))
     n = 0
     with transaction.atomic():
         InboundPutawayTask.objects.filter(purchase_order=po).exclude(status=InboundPutawayTask.Status.DONE).delete()
-        idx = 0
         for st in StagingItem.objects.filter(
             purchase_order=po,
             status=StagingItem.Status.READY_FOR_PUTAWAY,
-        ):
+        ).select_related("sku"):
             suggested_bin = _suggested_bin_for_sku(st.sku, st.quantity)
+            if not suggested_bin:
+                messages.error(request, f"No suitable bin found for {st.sku.sku_code}. Configure capacity/type/category first.")
+                continue
             loc = _suggested_location_for_sku(st.sku_id, suggested_bin)
-            assign = workers[idx % len(workers)] if workers else None
-            idx += 1
             InboundPutawayTask.objects.create(
                 purchase_order=po,
                 sku=st.sku,
                 quantity=st.quantity,
                 suggested_location=loc,
                 suggested_bin=suggested_bin,
-                assigned_to=assign,
+                assigned_to=_free_putaway_worker(),
                 status=InboundPutawayTask.Status.OPEN,
             )
             st.status = StagingItem.Status.CLEARED
@@ -468,8 +585,8 @@ def inbound_putaway_complete(request, task_id: int):
 
     with transaction.atomic():
         target_bin = task.suggested_bin
-        if target_bin.max_capacity > 0 and (target_bin.current_capacity + task.quantity) > target_bin.max_capacity:
-            messages.error(request, f"Cannot put-away {task.quantity} items into {target_bin.bin_code}. Capacity exceeded.")
+        if not _bin_accepts_sku(target_bin, task.sku, task.quantity):
+            messages.error(request, f"Cannot put-away {task.quantity} items into {target_bin.bin_code}. Capacity or SKU-mixing rule exceeded.")
             return redirect(f"/inbound/putaway/tasks/{task.id}/complete/")
             
         loc = task.suggested_location
@@ -496,6 +613,7 @@ def inbound_putaway_complete(request, task_id: int):
         inv, _ = Inventory.objects.get_or_create(
             sku=task.sku,
             bin=target_bin,
+            batch_number=task.purchase_order.lines.filter(sku=task.sku).values_list("received_batch", flat=True).first() or "",
             defaults={
                 "warehouse": target_bin.level.rack.aisle.zone.warehouse,
                 "zone": target_bin.level.rack.aisle.zone,

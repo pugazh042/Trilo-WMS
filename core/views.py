@@ -20,6 +20,7 @@ from django.views.decorators.http import require_http_methods
 from .decorators import role_required
 from .models import (
     Bin,
+    Aisle,
     Consolidation,
     InboundPutawayTask,
     Inventory,
@@ -35,6 +36,7 @@ from .models import (
     SKU,
     StockAdjustment,
     StockBin,
+    StockLedger,
     User,
     Warehouse,
     Zone,
@@ -65,6 +67,31 @@ def _sku_stock_available(sku_id: int) -> int:
     return total
 
 
+def _least_busy_packer() -> User | None:
+    packers = list(
+        User.objects.filter(role=User.Role.PACKER, is_active=True).annotate(
+            open_pack_count=Count(
+                "packings",
+                filter=Q(packings__status__in=[Packing.Status.PENDING, Packing.Status.IN_PROGRESS]),
+            )
+        )
+    )
+    if not packers:
+        return None
+    packers.sort(key=lambda u: u.open_pack_count)
+    return packers[0]
+
+
+def _assign_packer(packing: Packing) -> Packing:
+    if packing.packed_by_id:
+        return packing
+    packer = _least_busy_packer()
+    if packer:
+        packing.packed_by = packer
+        packing.save(update_fields=["packed_by"])
+    return packing
+
+
 def _allocate_order_core(order: Order) -> tuple[int, bool]:
     pickers = list(
         User.objects.filter(role=User.Role.PICKER, is_active=True).annotate(open_cnt=Count("pick_tasks"))
@@ -75,6 +102,7 @@ def _allocate_order_core(order: Order) -> tuple[int, bool]:
 
     created = 0
     fully = True
+    touched_sku_ids = set()
     with transaction.atomic():
         _unreserve_incomplete_pick_tasks(order)
         for item in order.items.all():
@@ -112,6 +140,7 @@ def _allocate_order_core(order: Order) -> tuple[int, bool]:
                 allocated_line += take
                 created += 1
                 remaining -= take
+                touched_sku_ids.add(item.sku_id)
             OrderItem.objects.filter(pk=item.pk).update(allocated_quantity=allocated_line)
             if remaining > 0:
                 fully = False
@@ -126,6 +155,8 @@ def _allocate_order_core(order: Order) -> tuple[int, bool]:
         else:
             order.status = Order.Status.ALLOCATED
         order.save(update_fields=["allocation_status", "status"])
+        for sku_id in touched_sku_ids:
+            SKU.objects.filter(pk=sku_id).update(quantity=_sku_stock_available(sku_id))
     return created, fully
 
 
@@ -587,7 +618,7 @@ def allocate_order(request, order_id: int):
         messages.success(request, f"Allocation complete. Created {created} pick task(s).")
     else:
         messages.error(request, "Allocation failed. No stock available.")
-    next_url = request.POST.get("next") or f"/orders/{order_id}/"
+    next_url = request.POST.get("next") or f"/picking/tasks/?order_id={order_id}"
     return redirect(next_url)
 
 
@@ -618,6 +649,27 @@ def pick_task_list(request):
         .order_by("status", "created_at")
     )
     return render(request, "picking/pick_task_list.html", {"tasks": tasks, "today_str": now_date_str()})
+
+
+@login_required
+@role_required("admin", "manager")
+def pick_task_monitor(request):
+    tasks = (
+        PickTask.objects.select_related("order", "sku", "picker")
+        .order_by("status", "-created_at")
+    )
+    order_id = request.GET.get("order_id") or ""
+    if order_id:
+        tasks = tasks.filter(order_id=order_id)
+    return render(
+        request,
+        "picking/pick_task_monitor.html",
+        {
+            "tasks": tasks[:300],
+            "order_id": order_id,
+            "today_str": now_date_str(),
+        },
+    )
 
 
 @login_required
@@ -668,19 +720,29 @@ def complete_pick_task(request, task: PickTask):
         messages.error(request, f"Wrong SKU. Expected {expected_sku}.")
         return redirect(f"/picking/task/{task.id}/")
 
-    if qty <= 0 or qty > task.quantity:
-        messages.error(request, f"Invalid quantity. Must be 1..{task.quantity}.")
+    if qty != task.quantity:
+        messages.error(request, f"Pick quantity must be exactly {task.quantity}.")
         return redirect(f"/picking/task/{task.id}/")
 
     with transaction.atomic():
         sb = StockBin.objects.select_for_update().get(id=task.stock_bin_id)
+        if sb.reserved < qty or sb.on_hand < qty:
+            messages.error(request, "Reserved stock is no longer available for this pick.")
+            return redirect(f"/picking/task/{task.id}/")
         sb.on_hand = max(0, sb.on_hand - qty)
         sb.reserved = max(0, sb.reserved - qty)
         sb.save(update_fields=["on_hand", "reserved"])
 
-        sku = SKU.objects.select_for_update().get(pk=task.sku_id)
-        sku.quantity = max(0, sku.quantity - qty)
-        sku.save(update_fields=["quantity"])
+        inv = (
+            Inventory.objects.select_for_update()
+            .filter(sku=task.sku, bin__bin_code=task.stock_bin.location.code)
+            .first()
+        )
+        if inv:
+            inv.quantity = max(0, inv.quantity - qty)
+            inv.save(update_fields=["quantity"])
+
+        SKU.objects.filter(pk=task.sku_id).update(quantity=_sku_stock_available(task.sku_id))
 
         task.picked_qty = qty
         task.status = PickTask.Status.COMPLETED
@@ -713,10 +775,31 @@ def consolidation_detail(request, order_id: int):
     order = get_object_or_404(Order, pk=order_id)
     cons = get_object_or_404(Consolidation, order=order)
     picks = PickTask.objects.filter(order=order, status=PickTask.Status.COMPLETED).select_related("sku")
+    verification_rows = []
+    all_matched = True
+    for item in order.items.select_related("sku"):
+        picked_qty = sum(p.picked_qty for p in picks if p.sku_id == item.sku_id)
+        matched = picked_qty == item.quantity
+        all_matched = all_matched and matched
+        verification_rows.append(
+            {
+                "item": item,
+                "picked_qty": picked_qty,
+                "matched": matched,
+                "pickers": sorted({p.picker.get_full_name() or p.picker.username for p in picks if p.sku_id == item.sku_id and p.picker_id}),
+            }
+        )
     return render(
         request,
         "consolidation/consolidation_detail.html",
-        {"order": order, "consolidation": cons, "picks": picks, "today_str": now_date_str()},
+        {
+            "order": order,
+            "consolidation": cons,
+            "picks": picks,
+            "verification_rows": verification_rows,
+            "all_matched": all_matched,
+            "today_str": now_date_str(),
+        },
     )
 
 
@@ -726,27 +809,41 @@ def consolidation_detail(request, order_id: int):
 def consolidation_send_packing(request, order_id: int):
     order = get_object_or_404(Order, pk=order_id)
     cons = get_object_or_404(Consolidation, order=order)
+    picks = PickTask.objects.filter(order=order, status=PickTask.Status.COMPLETED)
+    for item in order.items.all():
+        picked_qty = picks.filter(sku=item.sku).aggregate(total=Sum("picked_qty")).get("total") or 0
+        if picked_qty != item.quantity:
+            messages.error(request, f"Cannot send to packing. {item.sku.sku_code} picked {picked_qty}/{item.quantity}.")
+            return redirect(f"/consolidation/{order.id}/")
+    if request.POST.get("verified") != "1":
+        messages.error(request, "Verify picked items before sending to packing.")
+        return redirect(f"/consolidation/{order.id}/")
     cons.status = Consolidation.Status.READY_FOR_PACKING
     cons.verified_at = timezone.now()
     cons.save(update_fields=["status", "verified_at"])
     order.status = Order.Status.PACKING
     order.save(update_fields=["status"])
-    Packing.objects.get_or_create(order=order, defaults={"status": Packing.Status.PENDING})
+    packing, _ = Packing.objects.get_or_create(order=order, defaults={"status": Packing.Status.PENDING})
+    _assign_packer(packing)
     messages.success(request, "Sent to packing.")
     return redirect(f"/consolidation/{order.id}/")
 
 
 @login_required
-@role_required("packer")
+@role_required("admin", "manager", "packer")
 def packing_queue(request):
     rows = Packing.objects.filter(status__in=[Packing.Status.PENDING, Packing.Status.IN_PROGRESS]).select_related(
-        "order"
+        "order", "packed_by"
     )
+    for packing in rows:
+        if not packing.packed_by_id:
+            _assign_packer(packing)
+    rows = rows.select_related("order", "packed_by")
     return render(request, "packing/packing_queue.html", {"rows": rows, "today_str": now_date_str()})
 
 
 @login_required
-@role_required("packer")
+@role_required("admin", "manager", "packer")
 @require_http_methods(["GET", "POST"])
 def packing_order_detail(request, order_id: int):
     order = get_object_or_404(Order, pk=order_id)
@@ -761,7 +858,7 @@ def packing_order_detail(request, order_id: int):
 
 
 @login_required
-@role_required("packer")
+@role_required("admin", "manager", "packer")
 @require_http_methods(["GET", "POST"])
 def box_selection(request, order_id: int):
     order = get_object_or_404(Order, pk=order_id)
@@ -781,7 +878,7 @@ def box_selection(request, order_id: int):
 
 
 @login_required
-@role_required("packer")
+@role_required("admin", "manager", "packer")
 @require_http_methods(["GET", "POST"])
 def packing_process(request, order_id: int):
     order = get_object_or_404(Order, pk=order_id)
@@ -811,7 +908,7 @@ def packing_process(request, order_id: int):
 
 
 @login_required
-@role_required("packer")
+@role_required("admin", "manager", "packer")
 @require_http_methods(["GET", "POST"])
 def packing_label(request, order_id: int):
     order = get_object_or_404(Order, pk=order_id)
@@ -827,7 +924,7 @@ def packing_label(request, order_id: int):
 
 
 @login_required
-@role_required("packer")
+@role_required("admin", "manager", "packer")
 def packing_success(request, order_id: int):
     order = get_object_or_404(Order, pk=order_id)
     packing = get_object_or_404(Packing, order=order)
@@ -980,6 +1077,41 @@ def warehouse_detail(request, warehouse_id: int):
     return render(request, "warehouse/warehouse_detail.html", {"warehouse": warehouse, "today_str": now_date_str()})
 
 
+def _location_segment(prefix: str, value: str | int, width: int = 2) -> str:
+    raw = str(value).strip().upper()
+    stripped = raw.lstrip(prefix)
+    if stripped.isdigit():
+        return f"{prefix}{int(stripped):0{width}d}"
+    return f"{prefix}{stripped or '01'}"
+
+
+def _format_bin_code(rack: Rack, level: Level, bin_number: int) -> str:
+    aisle = rack.aisle
+    zone = aisle.zone
+    return "-".join(
+        [
+            zone.warehouse.code,
+            zone.code,
+            _location_segment("A", aisle.aisle_number, 2),
+            _location_segment("R", rack.rack_number, 2),
+            _location_segment("S", level.level_number, 1),
+            _location_segment("B", bin_number, 2),
+        ]
+    )
+
+
+def _location_for_bin(bin_obj: Bin) -> Location:
+    return Location.objects.get_or_create(
+        code=bin_obj.bin_code,
+        defaults={
+            "zone": bin_obj.level.rack.aisle.zone.code,
+            "aisle": bin_obj.level.rack.aisle.aisle_number,
+            "rack": bin_obj.level.rack.rack_number,
+            "bin": bin_obj.bin_code,
+        },
+    )[0]
+
+
 @login_required
 @role_required("admin", "manager")
 @require_http_methods(["GET", "POST"])
@@ -1025,6 +1157,8 @@ def zone_setup(request):
             code=(request.POST.get("code") or "").strip().upper(),
             type=(request.POST.get("type") or Zone.Type.BULK),
             temperature=(request.POST.get("temperature") or Zone.Temperature.NORMAL),
+            category=(request.POST.get("category") or "").strip(),
+            is_hazardous=bool(request.POST.get("is_hazardous")),
         )
         messages.success(request, "Zone created.")
         return redirect("/warehouse/zones/")
@@ -1041,9 +1175,11 @@ def zone_setup(request):
 def rack_setup(request):
     if request.method == "POST":
         zone = get_object_or_404(Zone, pk=request.POST.get("zone_id"))
+        aisle_number = (request.POST.get("aisle_number") or "01").strip().upper()
+        aisle, _ = Aisle.objects.get_or_create(zone=zone, aisle_number=aisle_number)
         total_levels = max(1, int(request.POST.get("levels") or 1))
         rack = Rack.objects.create(
-            zone=zone,
+            aisle=aisle,
             rack_number=(request.POST.get("rack_number") or "").strip().upper(),
             levels=total_levels,
             total_levels=total_levels,
@@ -1055,7 +1191,8 @@ def rack_setup(request):
         return redirect("/warehouse/racks/")
     return render(request, "warehouse/rack_setup.html", {
         "zones": Zone.objects.select_related("warehouse"), 
-        "racks": Rack.objects.select_related("zone__warehouse").order_by("rack_number"),
+        "aisles": Aisle.objects.select_related("zone__warehouse").order_by("zone__code", "aisle_number"),
+        "racks": Rack.objects.select_related("aisle__zone__warehouse").order_by("rack_number"),
         "today_str": now_date_str()
     })
 
@@ -1065,14 +1202,18 @@ def rack_setup(request):
 @require_http_methods(["GET", "POST"])
 def bin_configuration(request):
     if request.method == "POST":
-        rack = get_object_or_404(Rack.objects.select_related("zone__warehouse"), pk=request.POST.get("rack_id"))
+        rack = get_object_or_404(Rack.objects.select_related("aisle__zone__warehouse"), pk=request.POST.get("rack_id"))
         level = get_object_or_404(Level, pk=request.POST.get("level_id"), rack=rack)
         bins_per_level = max(1, int(request.POST.get("bins_per_level") or 1))
         size = request.POST.get("size") or Bin.Size.MEDIUM
+        bin_type = request.POST.get("bin_type") or Bin.BinType.SHELF
         max_capacity = max(0, int(request.POST.get("max_capacity") or 0))
+        weight_capacity = request.POST.get("weight_capacity") or 0
+        volume_capacity = request.POST.get("volume_capacity") or 0
+        allow_mixed_skus = bool(request.POST.get("allow_mixed_skus"))
         generated = 0
         for b in range(1, bins_per_level + 1):
-            code = f"{rack.zone.warehouse.code}-{rack.zone.code}-{rack.rack_number}-L{level.level_number}-B{b}"
+            code = _format_bin_code(rack, level, b)
             _, created = Bin.objects.get_or_create(
                 bin_code=code,
                 defaults={
@@ -1080,7 +1221,13 @@ def bin_configuration(request):
                     "level": level,
                     "level_number": level.level_number,
                     "size": size,
+                    "bin_type": bin_type,
+                    "allow_mixed_skus": allow_mixed_skus,
                     "max_capacity": max_capacity,
+                    "weight_capacity": weight_capacity,
+                    "volume_capacity": volume_capacity,
+                    "max_weight": weight_capacity,
+                    "max_volume": volume_capacity,
                 },
             )
             if created:
@@ -1088,9 +1235,10 @@ def bin_configuration(request):
         messages.success(request, f"{generated} bins generated.")
         return redirect("/warehouse/bins/")
     return render(request, "warehouse/bin_configuration.html", {
-        "racks": Rack.objects.select_related("zone__warehouse"), 
-        "levels": Level.objects.select_related("rack").order_by("rack_id", "level_number"),
-        "bins": Bin.objects.select_related("level__rack__zone__warehouse").order_by("bin_code")[:200],
+        "racks": Rack.objects.select_related("aisle__zone__warehouse"), 
+        "levels": Level.objects.select_related("rack__aisle__zone__warehouse").order_by("rack_id", "level_number"),
+        "bins": Bin.objects.select_related("level__rack__aisle__zone__warehouse").order_by("bin_code")[:200],
+        "bin_types": Bin.BinType.choices,
         "today_str": now_date_str()
     })
 
@@ -1136,6 +1284,7 @@ def create_sku(request):
             category=(request.POST.get("category") or "").strip(),
             brand=(request.POST.get("brand") or "").strip(),
             unit_type=(request.POST.get("unit_type") or SKU.UnitType.UNIT),
+            abc_class=(request.POST.get("abc_class") or SKU.ABCClass.C),
             weight=request.POST.get("weight") or 0,
             dimensions=(request.POST.get("dimensions") or "").strip(),
             barcode=f"BAR-{code}",
@@ -1143,31 +1292,37 @@ def create_sku(request):
         )
         messages.success(request, "SKU created.")
         return redirect("/inventory/skus/")
-    return render(request, "inventory/create_sku.html", {"today_str": now_date_str(), "unit_types": SKU.UnitType.choices})
+    return render(request, "inventory/create_sku.html", {"today_str": now_date_str(), "unit_types": SKU.UnitType.choices, "abc_classes": SKU.ABCClass.choices})
 
 
 @login_required
 @role_required("admin", "manager")
 def sku_detail(request, sku_id: int):
     sku = get_object_or_404(SKU, pk=sku_id)
-    inventory_rows = Inventory.objects.filter(sku=sku).select_related("warehouse", "zone", "bin__level__rack")
-    totals = inventory_rows.aggregate(total=Sum("quantity"))
-    allocated = (
-        PickTask.objects.filter(sku=sku, status__in=[PickTask.Status.PENDING, PickTask.Status.IN_PROGRESS]).aggregate(
-            total=Sum("quantity")
-        ).get("total")
-        or 0
-    )
-    total_qty = totals.get("total") or 0
+    inventory_rows = Inventory.objects.filter(sku=sku).select_related("warehouse", "zone", "bin__level__rack__aisle__zone")
+    total_qty = inventory_rows.aggregate(total=Sum("quantity")).get("total") or 0
+    allocated = StockBin.objects.filter(sku=sku).aggregate(total=Sum("reserved")).get("total") or 0
+    available_qty = sum(sb.available for sb in StockBin.objects.filter(sku=sku))
+    location_rows = []
+    for row in inventory_rows:
+        stock_bin = StockBin.objects.filter(sku=sku, location__code=row.bin.bin_code if row.bin_id else "").first()
+        reserved = stock_bin.reserved if stock_bin else 0
+        location_rows.append(
+            {
+                "record": row,
+                "reserved": reserved,
+                "available": stock_bin.available if stock_bin else 0,
+            }
+        )
     return render(
         request,
         "inventory/sku_detail.html",
         {
             "sku": sku,
-            "inventory_rows": inventory_rows,
+            "inventory_rows": location_rows,
             "total_qty": total_qty,
             "allocated_qty": allocated,
-            "available_qty": max(0, total_qty - allocated),
+            "available_qty": available_qty,
             "today_str": now_date_str(),
         },
     )
@@ -1176,7 +1331,7 @@ def sku_detail(request, sku_id: int):
 @login_required
 @role_required("admin", "manager")
 def inventory_list(request):
-    rows = Inventory.objects.select_related("sku", "warehouse", "zone", "bin__level__rack__zone__warehouse").order_by("-id")
+    rows = Inventory.objects.select_related("sku", "warehouse", "zone", "bin__level__rack__aisle__zone__warehouse").order_by("-id")
     warehouse = request.GET.get("warehouse") or ""
     zone = request.GET.get("zone") or ""
     category = request.GET.get("category") or ""
@@ -1186,11 +1341,26 @@ def inventory_list(request):
         rows = rows.filter(zone_id=zone)
     if category:
         rows = rows.filter(sku__category=category)
+    inventory_rows = []
+    for row in rows:
+        stock_bin = StockBin.objects.filter(
+            sku=row.sku,
+            location__code=row.bin.bin_code if row.bin_id else "",
+        ).first()
+        allocated_qty = stock_bin.reserved if stock_bin else 0
+        inventory_rows.append(
+            {
+                "record": row,
+                "total_qty": row.quantity,
+                "allocated_qty": allocated_qty,
+                "current_qty": stock_bin.available if stock_bin else 0,
+            }
+        )
     return render(
         request,
         "inventory/inventory_list.html",
         {
-            "rows": rows,
+            "rows": inventory_rows,
             "warehouses": Warehouse.objects.order_by("code"),
             "zones": Zone.objects.order_by("code"),
             "categories": SKU.objects.exclude(category="").values_list("category", flat=True).distinct(),
@@ -1221,6 +1391,17 @@ def stock_adjustment(request):
         else:
             inv.quantity = max(0, inv.quantity - qty)
             inv.bin.current_capacity = max(0, inv.bin.current_capacity - qty)
+        loc = _location_for_bin(inv.bin)
+        stock_bin, _ = StockBin.objects.get_or_create(
+            sku=inv.sku,
+            location=loc,
+            defaults={"on_hand": 0, "reserved": 0},
+        )
+        if adjustment_type == StockAdjustment.AdjustmentType.ADD:
+            stock_bin.on_hand += qty
+        else:
+            stock_bin.on_hand = max(0, stock_bin.on_hand - qty)
+        stock_bin.save(update_fields=["on_hand"])
         inv.bin.save(update_fields=["current_capacity"])
         inv.save(update_fields=["quantity"])
         inv.sku.quantity = int(sum([i.quantity for i in Inventory.objects.filter(sku=inv.sku)]))
@@ -1232,6 +1413,15 @@ def stock_adjustment(request):
             quantity=qty,
             reason=(request.POST.get("reason") or "").strip(),
             created_by=request.user,
+        )
+        StockLedger.objects.create(
+            sku=inv.sku,
+            movement_type=StockLedger.MovementType.ADJUSTMENT,
+            quantity=qty if adjustment_type == StockAdjustment.AdjustmentType.ADD else -qty,
+            from_bin=None if adjustment_type == StockAdjustment.AdjustmentType.ADD else inv.bin,
+            to_bin=inv.bin if adjustment_type == StockAdjustment.AdjustmentType.ADD else None,
+            reference_id=f"ADJUSTMENT-{inv.id}",
+            performed_by=request.user,
         )
         messages.success(request, "Stock adjusted.")
         return redirect("/inventory/adjustment/")
@@ -1271,6 +1461,10 @@ def rack_detail_view(request, rack_id: int):
         bins_data = []
         for b in bins:
             inv_rows = Inventory.objects.filter(bin=b, quantity__gt=0).select_related("sku")
+            usage_pct = b.occupancy_pct
+            status_class = "bin-empty"
+            if b.current_capacity > 0:
+                status_class = "bin-full" if b.max_capacity > 0 and b.current_capacity >= b.max_capacity else "bin-partial"
             bins_data.append({
                 "id": b.id,
                 "bin_code": b.bin_code,
@@ -1278,8 +1472,12 @@ def rack_detail_view(request, rack_id: int):
                 "bin_type": b.bin_type,
                 "max_capacity": b.max_capacity,
                 "current_capacity": b.current_capacity,
-                "usage_pct": int((b.current_capacity / b.max_capacity) * 100) if b.max_capacity > 0 else 0,
-                "inventory": [{"sku": i.sku.sku_code, "qty": i.quantity} for i in inv_rows],
+                "weight_capacity": float(b.weight_capacity),
+                "volume_capacity": float(b.volume_capacity),
+                "allow_mixed_skus": b.allow_mixed_skus,
+                "usage_pct": usage_pct,
+                "status_class": status_class,
+                "inventory": [{"sku": i.sku.sku_code, "sku_id": i.sku_id, "qty": i.quantity} for i in inv_rows],
             })
         levels_data.append({
             "level_number": lvl.level_number,
@@ -1289,13 +1487,14 @@ def rack_detail_view(request, rack_id: int):
     return render(request, "warehouse/rack_detail.html", {
         "rack": rack,
         "levels": levels_data,
+        "bins_json": json.dumps({str(b["id"]): b for level in levels_data for b in level["bins_data"]}),
+        "all_bins": Bin.objects.select_related("level__rack__aisle__zone__warehouse").exclude(rack=rack).order_by("bin_code"),
         "today_str": now_date_str()
     })
 
 @login_required
 @role_required("admin", "manager")
 def stock_transfer(request):
-    from .models import StockLedger
     return render(request, "inventory/stock_transfer.html", {
         "skus": SKU.objects.order_by("sku_code"),
         "bins": Bin.objects.select_related("level__rack__aisle__zone__warehouse").order_by("bin_code"),
@@ -1309,7 +1508,7 @@ def replenishment_tasks(request):
     from .models import ReplenishmentTask
     role = getattr(request.user, "role", "").lower()
     
-    qs = ReplenishmentTask.objects.select_related("sku", "from_bin", "to_bin", "assigned_to").order_by("-created_at")
+    qs = ReplenishmentTask.objects.select_related("sku", "source_bin", "destination_bin", "assigned_to").order_by("-created_at")
     if role in ("putaway", "picker"):
         qs = qs.filter(Q(assigned_to=request.user) | Q(assigned_to__isnull=True))
         

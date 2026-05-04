@@ -1,44 +1,92 @@
 {% extends "base.html" %}
-{% block title %}Trilo WMS — Dock Arrival{% endblock %}
-{% block header_title %}Dock Arrival{% endblock %}
+{% block title %}PO Details{% endblock %}
+{% block header_title %}PO Details{% endblock %}
 
 {% block content %}
   <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap">
     <div>
       <div class="page-title">{{ po.po_number }}</div>
-      <div class="page-subtitle">{{ po.supplier_name }} · <span class="badge badge-info">{{ po.get_status_display }}</span></div>
+      <div class="page-subtitle">{{ po.supplier_name }} · {{ po.get_status_display }}</div>
     </div>
-    <div style="display:flex; gap:10px; flex-wrap:wrap">
-      <a class="btn btn-outline" href="/inbound/">Back</a>
-      <a class="btn btn-outline" href="/inbound/{{ po.id }}/receipt/">Goods receipt</a>
-      <a class="btn btn-outline" href="/inbound/{{ po.id }}/qc/">QC</a>
-      <a class="btn btn-outline" href="/inbound/{{ po.id }}/staging/">Staging</a>
+    <a class="btn btn-outline" href="/inbound/">Back to POs</a>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+    <div class="card"><div class="card-body"><div class="muted">Supplier</div><div style="font-weight:800">{{ po.supplier_name }}</div></div></div>
+    <div class="card"><div class="card-body"><div class="muted">Expected Date</div><div style="font-weight:800">{{ po.expected_delivery_date|default:"-" }}</div></div></div>
+    <div class="card"><div class="card-body"><div class="muted">Dock</div><div style="font-weight:800">{{ po.dock_number|default:"Not assigned" }}</div></div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-header"><div class="card-title">PO Items</div></div>
+    <div class="card-body" style="padding:0">
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="background:var(--bg);border-bottom:1px solid var(--border)">
+            <th style="padding:12px 16px;text-align:left">SKU</th>
+            <th style="padding:12px 16px;text-align:left">Item</th>
+            <th style="padding:12px 16px;text-align:right">Expected</th>
+            <th style="padding:12px 16px;text-align:right">Received</th>
+            <th style="padding:12px 16px;text-align:left">Batch</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for line in po.lines.all %}
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:12px 16px;font-family:var(--mono);font-weight:700">{{ line.sku.sku_code }}</td>
+              <td style="padding:12px 16px">{{ line.sku.name }}</td>
+              <td style="padding:12px 16px;text-align:right;font-family:var(--mono)">{{ line.expected_qty }}</td>
+              <td style="padding:12px 16px;text-align:right;font-family:var(--mono)">{{ line.received_qty }}</td>
+              <td style="padding:12px 16px">{{ line.received_batch|default:"-" }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5" style="padding:16px" class="muted">No items in this PO.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
 
   <div class="card">
+    <div class="card-header"><div class="card-title">Dock Arrival & Goods Receipt</div></div>
     <div class="card-body">
-      <div class="stepper">
-        <span class="step active">Enter Dock</span><span class="step">Scan SKU</span><span class="step">Receive Batch/Qty</span><span class="step">Staging</span><span class="step">QC</span><span class="step">Put-away</span>
-      </div>
       <form method="post">
         {% csrf_token %}
         <div class="form-group">
-          <label class="form-label" for="dock_number">Assign dock</label>
-          <input class="form-control" id="dock_number" name="dock_number" value="{{ po.dock_number }}" placeholder="e.g. Dock-3" />
+          <label class="form-label" for="dock_number">Dock number</label>
+          <input class="form-control" id="dock_number" name="dock_number" value="{{ po.dock_number }}" placeholder="Dock-3" autofocus />
         </div>
-        <div style="display:flex; justify-content:flex-end">
-          <button class="btn btn-primary" type="submit">Mark Arrived</button>
+
+        <table style="width:100%;border-collapse:collapse;margin-top:12px">
+          <thead>
+            <tr style="background:var(--bg);border-bottom:1px solid var(--border)">
+              <th style="padding:12px 16px;text-align:left">SKU</th>
+              <th style="padding:12px 16px;text-align:right">Expected</th>
+              <th style="padding:12px 16px;text-align:right">Received Qty</th>
+              <th style="padding:12px 16px;text-align:left">Batch</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for line in po.lines.all %}
+              <tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:12px 16px;font-family:var(--mono)">{{ line.sku.sku_code }}</td>
+                <td style="padding:12px 16px;text-align:right;font-family:var(--mono)">{{ line.expected_qty }}</td>
+                <td style="padding:12px 16px;text-align:right">
+                  <input class="form-control" style="max-width:140px;margin-left:auto" type="number" min="0" max="{{ line.expected_qty }}" name="recv_{{ line.id }}" value="{{ line.received_qty }}" />
+                </td>
+                <td style="padding:12px 16px">
+                  <input class="form-control" name="batch_{{ line.id }}" value="{{ line.received_batch }}" placeholder="Batch number" />
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+          <button class="btn btn-outline" type="submit" name="action" value="save_arrival">Save Arrival</button>
+          <button class="btn btn-primary" type="submit" name="action" value="move_qc">Move for QC</button>
         </div>
       </form>
-      <p class="muted" style="margin-top:10px">This will move the PO to “Arrived” (if it was Created).</p>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-        <a class="btn btn-outline btn-sm" href="/inbound/{{ po.id }}/scan/">Scan barcode / enter SKU</a>
-        <a class="btn btn-outline btn-sm" href="/inbound/{{ po.id }}/receipt/">Enter batch & received qty</a>
-        <a class="btn btn-outline btn-sm" href="/inbound/{{ po.id }}/staging/">Send to staging</a>
-        <a class="btn btn-outline btn-sm" href="/inbound/{{ po.id }}/qc/">Move to QC</a>
-      </div>
     </div>
   </div>
 {% endblock %}
-

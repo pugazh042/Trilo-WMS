@@ -1,21 +1,21 @@
 {% extends "base.html" %}
-{% block title %}Trilo WMS — Allocation{% endblock %}
-{% block header_title %}Order allocation{% endblock %}
+{% block title %}Allocation{% endblock %}
+{% block header_title %}Allocation{% endblock %}
 
 {% block content %}
   <div class="page-header">
-    <div class="page-title">Allocation workspace</div>
-    <div class="page-subtitle">Queue · details · stock & picker preview</div>
+    <div class="page-title">Allocation</div>
+    <div class="page-subtitle">Select an order and reserve available stock</div>
   </div>
 
-  <div style="display:grid; grid-template-columns: minmax(220px,280px) 1fr minmax(260px,320px); gap:16px; align-items:start">
+  <div style="display:grid;grid-template-columns:minmax(240px,320px) 1fr;gap:16px;align-items:start">
     <div class="card">
-      <div class="card-header"><div class="card-title">Order queue</div></div>
-      <div class="card-body" style="padding:8px 0; max-height:70vh; overflow:auto">
+      <div class="card-header"><div class="card-title">Orders</div></div>
+      <div class="card-body" style="padding:8px 0;max-height:70vh;overflow:auto">
         {% for o in orders %}
-          <a href="/allocation/?order_id={{ o.id }}" class="nav-item {% if selected and selected.id == o.id %}active{% endif %}" style="border-radius:0; margin:0 8px">
-            <span style="font-family:var(--mono); font-weight:700">{{ o.order_id }}</span>
-            <span class="badge badge-info" style="margin-left:auto">{{ o.get_status_display }}</span>
+          <a href="/allocation/?order_id={{ o.id }}" class="nav-item {% if selected and selected.id == o.id %}active{% endif %}" style="border-radius:0;margin:0 8px">
+            <span style="font-family:var(--mono);font-weight:700">{{ o.order_id }}</span>
+            <span class="badge badge-info" style="margin-left:auto">{{ o.get_allocation_status_display }}</span>
           </a>
         {% empty %}
           <p class="muted" style="padding:12px">No orders.</p>
@@ -24,63 +24,42 @@
     </div>
 
     <div class="card">
-      <div class="card-header"><div class="card-title">Order details</div></div>
+      <div class="card-header"><div class="card-title">Order Stock</div></div>
       <div class="card-body">
         {% if selected %}
-          <p><strong>{{ selected.order_id }}</strong> — {{ selected.customer_name }}</p>
-          <p class="muted">{{ selected.delivery_address|truncatewords:30 }}</p>
-          <p>
-            <span class="badge badge-purple">{{ selected.get_allocation_status_display }}</span>
-            {% if selected.on_hold %}<span class="badge badge-warning">On hold</span>{% endif %}
-          </p>
-          <table style="width:100%; margin-top:12px; border-collapse:collapse; font-size:13px">
+          <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap">
+            <div>
+              <div style="font-family:var(--mono);font-weight:800">{{ selected.order_id }}</div>
+              <div>{{ selected.customer_name }}</div>
+              {% if selected.on_hold %}<span class="badge badge-warning">On hold</span>{% endif %}
+            </div>
+            <form method="post" action="/orders/{{ selected.id }}/allocate/">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="/picking/tasks/?order_id={{ selected.id }}" />
+              <button class="btn btn-primary" type="submit" {% if selected.on_hold %}disabled{% endif %}>Allocate</button>
+            </form>
+          </div>
+
+          <table style="width:100%;margin-top:16px;border-collapse:collapse">
             <thead>
               <tr style="border-bottom:1px solid var(--border)">
-                <th style="text-align:left; padding:6px 0">SKU</th>
-                <th style="text-align:right; padding:6px 0">Need</th>
-                <th style="text-align:right; padding:6px 0">Avail</th>
+                <th style="text-align:left;padding:10px 0">SKU</th>
+                <th style="text-align:right;padding:10px 0">Required</th>
+                <th style="text-align:right;padding:10px 0">Available</th>
               </tr>
             </thead>
             <tbody>
               {% for row in line_rows %}
                 <tr style="border-bottom:1px solid var(--border)">
-                  <td style="padding:8px 0; font-family:var(--mono)">{{ row.item.sku.sku_code }}</td>
+                  <td style="padding:10px 0;font-family:var(--mono)">{{ row.item.sku.sku_code }}</td>
                   <td style="text-align:right">{{ row.item.quantity }}</td>
-                  <td style="text-align:right">
-                    <span class="badge {% if row.ok %}badge-success{% else %}badge-danger{% endif %}">{{ row.available }}</span>
-                  </td>
+                  <td style="text-align:right"><span class="badge {% if row.ok %}badge-success{% else %}badge-danger{% endif %}">{{ row.available }}</span></td>
                 </tr>
               {% endfor %}
             </tbody>
           </table>
         {% else %}
-          <p class="muted">Select an order from the queue.</p>
-        {% endif %}
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-header"><div class="card-title">Allocation panel</div></div>
-      <div class="card-body" style="display:flex; flex-direction:column; gap:10px">
-        {% if selected %}
-          <form method="post" action="/orders/{{ selected.id }}/allocate/">
-            {% csrf_token %}
-            <input type="hidden" name="next" value="/allocation/?order_id={{ selected.id }}" />
-            <button class="btn btn-primary btn-full" type="submit" {% if selected.on_hold %}disabled{% endif %}>Allocate order</button>
-          </form>
-          <form method="post" action="/orders/{{ selected.id }}/auto-allocate/">
-            {% csrf_token %}
-            <input type="hidden" name="next" value="/allocation/?order_id={{ selected.id }}" />
-            <button class="btn btn-outline btn-full" type="submit" {% if selected.on_hold %}disabled{% endif %}>Auto allocate</button>
-          </form>
-          <form method="post" action="/orders/{{ selected.id }}/hold/">
-            {% csrf_token %}
-            <input type="hidden" name="next" value="/allocation/?order_id={{ selected.id }}" />
-            <button class="btn btn-ghost btn-full" type="submit">Hold / release</button>
-          </form>
-          <small class="muted">Pickers are assigned by workload (round-robin). Locations use bin availability.</small>
-        {% else %}
-          <p class="muted">Select an order first.</p>
+          <p class="muted">Select an order.</p>
         {% endif %}
       </div>
     </div>

@@ -499,11 +499,19 @@ class Bin(models.Model):
     allow_mixed_skus = models.BooleanField(default=False)
     max_capacity = models.PositiveIntegerField(default=0)
     current_capacity = models.PositiveIntegerField(default=0)
+    weight_capacity = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    volume_capacity = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     max_weight = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     max_volume = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def __str__(self) -> str:
         return self.bin_code
+
+    @property
+    def occupancy_pct(self) -> int:
+        if not self.max_capacity:
+            return 0
+        return min(100, int((self.current_capacity / self.max_capacity) * 100))
 
 
 class Inventory(models.Model):

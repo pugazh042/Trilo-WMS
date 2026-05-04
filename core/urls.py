@@ -18,6 +18,7 @@ urlpatterns = [
     path("orders/<int:order_id>/hold/", views.hold_order, name="hold_order"),
     path("allocation/", views.allocation_page, name="allocation"),
     path("picking/", views.pick_task_list, name="pick_task_list"),
+    path("picking/tasks/", views.pick_task_monitor, name="pick_task_monitor"),
     path("picking/task/<int:task_id>/", views.pick_task_detail, name="pick_task_detail"),
     path("consolidation/", views.consolidation_queue, name="consolidation_queue"),
     path("consolidation/<int:order_id>/", views.consolidation_detail, name="consolidation_detail"),
